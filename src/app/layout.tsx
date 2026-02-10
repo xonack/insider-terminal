@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { TerminalShell } from "@/components/layout/TerminalShell";
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <TerminalShell>{children}</TerminalShell>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
