@@ -2,6 +2,7 @@
 
 import { useMarkets } from "@/hooks/useMarkets";
 import { InsiderIndicator } from "./InsiderIndicator";
+import { MarketBadge } from "@/components/shared/MarketBadge";
 import { formatCompact } from "@/lib/utils/format";
 
 export function MarketGrid() {
@@ -44,6 +45,7 @@ export function MarketGrid() {
           conditionId={market.conditionId}
           title={market.title}
           slug={market.slug}
+          source={market.source ?? "polymarket"}
           traderCount={market.traderCount}
           totalVolume={market.totalVolume}
           tradeCount={market.tradeCount}
@@ -58,44 +60,56 @@ interface MarketCardProps {
   conditionId: string;
   title: string;
   slug: string;
+  source: "polymarket" | "kalshi";
   traderCount: number;
   totalVolume: number;
   tradeCount: number;
   insiderCount: number;
 }
 
+function getMarketUrl(source: "polymarket" | "kalshi", slug: string, conditionId: string): string {
+  if (source === "kalshi") {
+    return `https://kalshi.com/markets/${conditionId}`;
+  }
+  return slug
+    ? `https://polymarket.com/event/${slug}`
+    : `https://polymarket.com`;
+}
+
 function MarketCard({
   conditionId,
   title,
   slug,
+  source,
   traderCount,
   totalVolume,
   tradeCount,
   insiderCount,
 }: MarketCardProps) {
-  const polymarketUrl = slug
-    ? `https://polymarket.com/event/${slug}`
-    : `https://polymarket.com`;
+  const marketUrl = getMarketUrl(source, slug, conditionId);
 
   return (
     <a
-      href={polymarketUrl}
+      href={marketUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="bg-terminal-panel border border-terminal-border p-3 flex flex-col gap-2 hover:border-terminal-dim transition-colors group"
     >
-      {/* Title */}
-      <h3
-        className="text-terminal-text text-xs font-bold leading-tight group-hover:text-terminal-green transition-colors"
-        style={{
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
-        {title}
-      </h3>
+      {/* Title + Badge */}
+      <div className="flex items-start gap-1.5">
+        <MarketBadge source={source} />
+        <h3
+          className="text-terminal-text text-xs font-bold leading-tight group-hover:text-terminal-green transition-colors flex-1"
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {title}
+        </h3>
+      </div>
 
       {/* Stats row */}
       <div className="flex items-center justify-between">

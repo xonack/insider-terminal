@@ -2,10 +2,12 @@
 
 import { AddressDisplay } from "@/components/shared/AddressDisplay";
 import { ScoreBadge } from "@/components/shared/ScoreBadge";
+import { MarketBadge } from "@/components/shared/MarketBadge";
 
 interface WalletHeaderProps {
   address: string;
   username: string | null;
+  source?: "polymarket" | "kalshi";
   totalScore: number;
   totalVolume: number | null;
   totalPnl: number | null;
@@ -44,6 +46,7 @@ function formatNumber(value: number | null): string {
 export function WalletHeader({
   address,
   username,
+  source = "polymarket",
   totalScore,
   totalVolume,
   totalPnl,
@@ -53,7 +56,9 @@ export function WalletHeader({
   bandLabel,
   bandColor,
 }: WalletHeaderProps) {
-  const polymarketUrl = `https://polymarket.com/profile/${address}`;
+  const profileUrl = source === "kalshi"
+    ? `https://kalshi.com`
+    : `https://polymarket.com/profile/${address}`;
   const pnlColor =
     totalPnl !== null && totalPnl >= 0
       ? "text-terminal-green"
@@ -63,9 +68,10 @@ export function WalletHeader({
     <div className="bg-terminal-panel border border-terminal-border p-4">
       {/* Top row: address + score */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <MarketBadge source={source} />
           <a
-            href={polymarketUrl}
+            href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"

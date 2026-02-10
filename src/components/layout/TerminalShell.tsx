@@ -117,7 +117,27 @@ export function TerminalShell({ children }: TerminalShellProps) {
               </span>
             </span>
           </div>
-          <Clock />
+          <div className="flex items-center gap-3">
+            <select
+              className="bg-terminal-surface text-terminal-muted text-[10px] uppercase tracking-wider border border-terminal-border rounded px-1.5 py-0.5 focus:outline-none focus:border-terminal-green cursor-pointer"
+              defaultValue="all"
+              onChange={(e) => {
+                const val = e.target.value;
+                const url = new URL(window.location.href);
+                if (val === "all") {
+                  url.searchParams.delete("source");
+                } else {
+                  url.searchParams.set("source", val);
+                }
+                window.location.href = url.toString();
+              }}
+            >
+              <option value="all">ALL MKTS</option>
+              <option value="polymarket">POLY</option>
+              <option value="kalshi">KALSHI</option>
+            </select>
+            <Clock />
+          </div>
         </header>
 
         {/* Desktop Sidebar */}
