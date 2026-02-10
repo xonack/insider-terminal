@@ -50,7 +50,7 @@ function getColumns(offset: number) {
   return [
     columnHelper.display({
       id: "rank",
-      header: "#",
+      header: () => <span title="Rank by insider probability score">#</span>,
       cell: (info) => (
         <span className="text-terminal-dim">
           {info.row.index + offset + 1}
@@ -60,14 +60,14 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("total_score", {
-      header: "SCORE",
+      header: () => <span title="Composite insider probability score (0-100). Weighted sum of 7 behavioral signals.">SCORE</span>,
       cell: (info) => <ScoreBadge score={info.getValue()} />,
       size: 60,
       enableSorting: true,
     }),
 
     columnHelper.accessor("address", {
-      header: "WALLET",
+      header: () => <span title="Polymarket proxy wallet address and username">WALLET</span>,
       cell: (info) => {
         const username = info.row.original.username;
         return (
@@ -87,7 +87,7 @@ function getColumns(offset: number) {
 
     columnHelper.display({
       id: "signals",
-      header: "SIGNALS",
+      header: () => <span title="7 behavioral signals: Wallet Age, First Bet, Bet Timing, Withdrawal Speed, Market Selection, Win Rate, No Hedging. Hover each bar for details.">SIGNALS</span>,
       cell: (info) => {
         const row = info.row.original;
         return (
@@ -106,7 +106,7 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("total_volume", {
-      header: "VOLUME",
+      header: () => <span title="Total USD trading volume across analyzed trades">VOLUME</span>,
       cell: (info) => (
         <span className="text-terminal-text">{formatUsd(info.getValue())}</span>
       ),
@@ -115,7 +115,7 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("total_pnl", {
-      header: "PNL",
+      header: () => <span title="Realized + unrealized profit and loss from open positions">PNL</span>,
       cell: (info) => {
         const val = info.getValue();
         if (val === null || val === undefined) return <span>-</span>;
@@ -146,7 +146,7 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("last_trade_at", {
-      header: "LAST ACTIVE",
+      header: () => <span title="Time since the wallet's most recent trade">LAST ACTIVE</span>,
       cell: (info) => (
         <span className="text-terminal-dim">
           {formatRelativeTime(info.getValue())}
