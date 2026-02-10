@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TerminalBoot } from "@/components/onboarding/TerminalBoot";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Menu, X } from "lucide-react";
+import { Menu, X, MessageSquare } from "lucide-react";
+import { SupportModal } from "./SupportModal";
 
 interface StatusData {
   wallets: number;
@@ -65,6 +66,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useLocalStorage(ONBOARDING_KEY, false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const { data: status } = useQuery<StatusData>({
     queryKey: ["status"],
@@ -144,6 +146,16 @@ export function TerminalShell({ children }: TerminalShellProps) {
               </Link>
             );
           })}
+
+          {/* Support button */}
+          <button
+            type="button"
+            onClick={() => setSupportOpen(true)}
+            className="mt-auto flex items-center gap-2 px-4 py-2 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
+          >
+            <MessageSquare size={12} />
+            <span>Support</span>
+          </button>
         </nav>
 
         {/* Mobile Sidebar Overlay */}
@@ -181,6 +193,19 @@ export function TerminalShell({ children }: TerminalShellProps) {
                   </Link>
                 );
               })}
+
+              {/* Support button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  setSupportOpen(true);
+                }}
+                className="mt-auto flex items-center gap-2 px-4 py-3 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
+              >
+                <MessageSquare size={12} />
+                <span>Support</span>
+              </button>
             </nav>
           </div>
         )}
@@ -220,6 +245,8 @@ export function TerminalShell({ children }: TerminalShellProps) {
           })}
         </nav>
       </div>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
     </>
   );
 }
