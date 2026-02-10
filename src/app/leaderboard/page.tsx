@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -247,7 +247,7 @@ export default function LeaderboardPage() {
             </span>
           )}
           {data?.hasStaleData && (
-            <span className="text-terminal-orange text-[10px]">
+            <span className="text-terminal-orange text-[10px] cursor-help" title="Hit scan to update data.">
               [STALE DATA]
             </span>
           )}
