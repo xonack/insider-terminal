@@ -121,19 +121,28 @@ export async function getWallet(address: string): Promise<WalletRow | null> {
 
 export async function getLeaderboard(limit: number, offset: number, minScore?: number, source?: MarketSource): Promise<WalletRow[]> {
   const db = await ensureDb();
+  const scoreFilter = minScore !== undefined ? 'AND total_score >= ?' : '';
+  const scoreArgs = minScore !== undefined ? [minScore] : [];
   const sourceFilter = source ? 'AND market_source = ?' : '';
   const sourceArgs = source ? [source] : [];
 
-  if (minScore !== undefined) {
-    const result = await db.execute({
-      sql: `SELECT * FROM wallets WHERE total_score >= ? ${sourceFilter} ORDER BY total_score DESC LIMIT ? OFFSET ?`,
-      args: [minScore, ...sourceArgs, limit, offset],
-    });
-    return result.rows as unknown as WalletRow[];
-  }
+  // Deduplicate: keep only the highest-scored wallet per username.
+  // NULL usernames partition by address so each stays as a separate row.
   const result = await db.execute({
-    sql: `SELECT * FROM wallets WHERE 1=1 ${sourceFilter} ORDER BY total_score DESC LIMIT ? OFFSET ?`,
-    args: [...sourceArgs, limit, offset],
+    sql: `
+      SELECT * FROM (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(username, address)
+          ORDER BY total_score DESC
+        ) AS rn
+        FROM wallets
+        WHERE 1=1 ${scoreFilter} ${sourceFilter}
+      ) ranked
+      WHERE rn = 1
+      ORDER BY total_score DESC
+      LIMIT ? OFFSET ?
+    `,
+    args: [...scoreArgs, ...sourceArgs, limit, offset],
   });
   return result.rows as unknown as WalletRow[];
 }
@@ -152,14 +161,13 @@ export async function getStaleWallets(maxAgeSeconds: number, limit: number, sour
 
 export async function getWalletCount(source?: MarketSource): Promise<number> {
   const db = await ensureDb();
-  if (source) {
-    const result = await db.execute({
-      sql: 'SELECT COUNT(*) as count FROM wallets WHERE market_source = ?',
-      args: [source],
-    });
-    return Number(result.rows[0].count);
-  }
-  const result = await db.execute('SELECT COUNT(*) as count FROM wallets');
+  const sourceFilter = source ? 'WHERE market_source = ?' : '';
+  const sourceArgs = source ? [source] : [];
+  // Count unique users (deduplicated by username, NULL usernames count individually)
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) as count FROM (SELECT 1 FROM wallets ${sourceFilter} GROUP BY COALESCE(username, address))`,
+    args: sourceArgs,
+  });
   return Number(result.rows[0].count);
 }
 
