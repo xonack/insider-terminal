@@ -92,4 +92,18 @@ export async function initializeDatabase(db: Client): Promise<void> {
   `);
 
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_activities_wallet ON activities(wallet_address, timestamp DESC)`);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tweet_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tweet_type TEXT NOT NULL,
+      ref_id TEXT NOT NULL,
+      tweet_id TEXT,
+      tweet_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'sent',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tweet_log_ref ON tweet_log(tweet_type, ref_id)`);
 }

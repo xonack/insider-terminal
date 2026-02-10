@@ -3,6 +3,7 @@ import { getRecentTraders } from '@/lib/polymarket/data-api';
 import { getWallet, getWalletCount } from '@/lib/db/queries';
 import { scoreWallet } from '@/lib/scoring/engine';
 import { CACHE_TTL } from '@/lib/utils/constants';
+import { dispatchTweets } from '@/lib/twitter/dispatcher';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for cron
@@ -42,14 +43,19 @@ export async function GET(request: NextRequest) {
     }
 
     const total = await getWalletCount();
+    const tweets = await dispatchTweets();
 
-    console.log(`[cron] Scanned ${scanned} wallets, ${newAlerts} alerts, ${total} total`);
+    console.log(
+      `[cron] Scanned ${scanned} wallets, ${newAlerts} alerts, ${total} total, ` +
+      `tweeted ${tweets.alertsTweeted} alerts, leaderboard: ${tweets.leaderboardTweeted}`
+    );
 
     return NextResponse.json({
       scanned,
       newAlerts,
       total,
       discovered: walletAddresses.length,
+      tweets,
       ...(errors.length > 0 ? { errors } : {}),
     });
   } catch (error) {

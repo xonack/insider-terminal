@@ -318,3 +318,47 @@ export async function clearActivitiesForWallet(address: string): Promise<void> {
     args: [address],
   });
 }
+
+// --- Tweet log operations ---
+
+export interface TweetLogRow {
+  id: number;
+  tweet_type: string;
+  ref_id: string;
+  tweet_id: string | null;
+  tweet_text: string;
+  status: string;
+  created_at: number;
+}
+
+export async function isTweetLogged(tweetType: string, refId: string): Promise<boolean> {
+  const db = await ensureDb();
+  const result = await db.execute({
+    sql: 'SELECT 1 FROM tweet_log WHERE tweet_type = ? AND ref_id = ? LIMIT 1',
+    args: [tweetType, refId],
+  });
+  return result.rows.length > 0;
+}
+
+export async function insertTweetLog(
+  log: Omit<TweetLogRow, 'id' | 'created_at'>
+): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO tweet_log (tweet_type, ref_id, tweet_id, tweet_text, status)
+          VALUES (?, ?, ?, ?, ?)`,
+    args: [log.tweet_type, log.ref_id, log.tweet_id, log.tweet_text, log.status],
+  });
+}
+
+export async function getUntweetedAlerts(): Promise<AlertRow[]> {
+  const db = await ensureDb();
+  const result = await db.execute(`
+    SELECT a.* FROM alerts a
+    LEFT JOIN tweet_log t ON t.tweet_type = 'alert' AND t.ref_id = CAST(a.id AS TEXT)
+    WHERE t.id IS NULL AND a.score_at_time > 60
+    ORDER BY a.created_at DESC
+    LIMIT 10
+  `);
+  return result.rows as unknown as AlertRow[];
+}
