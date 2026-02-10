@@ -21,24 +21,32 @@ export interface PolymarketTrade {
 }
 
 export interface PolymarketPosition {
+  proxyWallet: string;
   asset: string;
   conditionId: string;
   size: number;
   avgPrice: number;
-  currentPrice: number;
+  curPrice: number;
   initialValue: number;
   currentValue: number;
-  cashflow: number;
+  cashPnl: number;
   realizedPnl: number;
-  curPnl: number;
   percentPnl: number;
+  percentRealizedPnl: number;
+  totalBought: number;
   outcome: string;
   outcomeIndex: number;
-  market: string;
+  oppositeOutcome: string;
+  oppositeAsset: string;
   title: string;
   slug: string;
+  icon: string;
+  eventId: string;
+  eventSlug: string;
   endDate: string;
-  closed: boolean;
+  redeemable: boolean;
+  mergeable: boolean;
+  negativeRisk: boolean;
 }
 
 export interface PolymarketActivity {

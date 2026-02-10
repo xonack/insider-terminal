@@ -134,7 +134,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   // Compute metadata
   const sorted = sortTradesByTime(trades);
   const totalVolume = trades.reduce((sum, t) => sum + tradeUsdValue(t), 0);
-  const totalPnl = positions.reduce((sum, p) => sum + p.realizedPnl + p.curPnl, 0);
+  const totalPnl = positions.reduce((sum, p) => sum + p.realizedPnl + p.cashPnl, 0);
 
   const metadata = {
     totalVolume,

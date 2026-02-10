@@ -272,6 +272,13 @@ export async function getAlertCount(): Promise<number> {
   return Number(result.rows[0].count);
 }
 
+export async function getLastScanTime(): Promise<number | null> {
+  const db = await ensureDb();
+  const result = await db.execute('SELECT MAX(scored_at) as last_scan FROM wallets');
+  const val = result.rows[0]?.last_scan;
+  return val ? Number(val) : null;
+}
+
 // --- Activity operations ---
 
 export async function insertActivities(activities: ActivityRow[]): Promise<void> {

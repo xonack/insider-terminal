@@ -39,10 +39,11 @@ export function scoreWinRate(
   let losses = 0;
 
   for (const pos of positions) {
-    if (!pos.closed) continue;
-
     const market = marketCache.get(pos.conditionId);
     if (!market || market.end_date === null) continue;
+
+    // Position is "closed" if the market has resolved
+    if (market.resolved_at === null) continue;
 
     const firstTrade = firstTradePerMarket.get(pos.conditionId);
     if (firstTrade === undefined) continue;

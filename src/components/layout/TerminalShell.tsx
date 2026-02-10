@@ -3,8 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TerminalBoot } from "@/components/onboarding/TerminalBoot";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+
+interface StatusData {
+  wallets: number;
+  alerts: number;
+  lastScan: number | null;
+}
+
+function formatScanTime(timestamp: number | null): string {
+  if (!timestamp) return "NEVER";
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - timestamp;
+  if (diff < 60) return "JUST NOW";
+  if (diff < 3600) return `${Math.floor(diff / 60)}M AGO`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}H AGO`;
+  return `${Math.floor(diff / 86400)}D AGO`;
+}
 
 const NAV_ITEMS = [
   { label: "LDRBD", href: "/leaderboard", description: "Leaderboard" },
@@ -46,6 +63,16 @@ export function TerminalShell({ children }: TerminalShellProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useLocalStorage(ONBOARDING_KEY, false);
+
+  const { data: status } = useQuery<StatusData>({
+    queryKey: ["status"],
+    queryFn: async () => {
+      const res = await fetch("/api/status");
+      if (!res.ok) throw new Error("Failed to fetch status");
+      return res.json() as Promise<StatusData>;
+    },
+    refetchInterval: 30_000,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -114,13 +141,11 @@ export function TerminalShell({ children }: TerminalShellProps) {
 
         {/* Status bar */}
         <footer className="col-span-2 flex items-center px-4 text-[10px] text-terminal-dim border-t border-terminal-border bg-terminal-panel uppercase tracking-wider">
-          <span>API: ---/1000</span>
+          <span>Wallets: {status?.wallets ?? "---"}</span>
           <span className="mx-3">|</span>
-          <span>Wallets: ---</span>
+          <span>Alerts: {status?.alerts ?? "---"}</span>
           <span className="mx-3">|</span>
-          <span>Alerts: ---</span>
-          <span className="mx-3">|</span>
-          <span>Last Scan: never</span>
+          <span>Last Scan: {status ? formatScanTime(status.lastScan) : "---"}</span>
         </footer>
       </div>
     </>
