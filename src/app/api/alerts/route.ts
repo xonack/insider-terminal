@@ -15,17 +15,19 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type') ?? undefined;
 
   try {
-    const alerts = getAlerts(limit, offset, type);
-    const total = getAlertCount();
+    const alerts = await getAlerts(limit, offset, type);
+    const total = await getAlertCount();
 
     // Join wallet username for display
-    const alertsWithUsername: AlertWithUsername[] = alerts.map((alert) => {
-      const wallet = getWallet(alert.wallet_address);
-      return {
-        ...alert,
-        username: wallet?.username ?? null,
-      };
-    });
+    const alertsWithUsername: AlertWithUsername[] = await Promise.all(
+      alerts.map(async (alert) => {
+        const wallet = await getWallet(alert.wallet_address);
+        return {
+          ...alert,
+          username: wallet?.username ?? null,
+        };
+      }),
+    );
 
     return NextResponse.json({
       alerts: alertsWithUsername,

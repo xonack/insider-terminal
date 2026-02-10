@@ -22,7 +22,7 @@ export async function POST() {
     for (const address of walletAddresses) {
       if (scanned >= MAX_WALLETS_PER_SCAN) break;
 
-      const existing = getWallet(address);
+      const existing = await getWallet(address);
 
       // Skip if recently scored
       if (existing && now - existing.scored_at < CACHE_TTL.walletScore) {
@@ -43,7 +43,7 @@ export async function POST() {
       }
     }
 
-    const total = getWalletCount();
+    const total = await getWalletCount();
 
     return NextResponse.json({
       scanned,

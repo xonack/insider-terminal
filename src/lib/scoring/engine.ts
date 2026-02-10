@@ -39,10 +39,10 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
     }
   }
 
-  // First pass: load all cached markets from SQLite
+  // First pass: load all cached markets from DB
   const toFetch: Array<{ conditionId: string; slug: string }> = [];
   for (const [conditionId, slug] of slugMap) {
-    const cached = getMarketFromDb(conditionId);
+    const cached = await getMarketFromDb(conditionId);
     if (cached && now - cached.cached_at < CACHE_TTL.marketMetadata) {
       cache.set(conditionId, cached);
     } else {
@@ -79,7 +79,7 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
         cached_at: now,
       };
 
-      upsertMarket(row);
+      await upsertMarket(row);
       cache.set(batch[j].conditionId, row);
     }
   }
@@ -94,7 +94,7 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
  * 2. Fetch and cache market metadata
  * 3. Run all 7 signals
  * 4. Compute weighted composite score
- * 5. Store results in SQLite
+ * 5. Store results in DB
  * 6. Generate alerts if score > 60
  * 7. Return ScoringResult
  */
@@ -144,7 +144,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
     lastTradeAt: sorted.length > 0 ? sorted[sorted.length - 1].timestamp : null,
   };
 
-  // 5. Store in SQLite
+  // 5. Store in DB
   const now = nowUnix();
 
   // Extract username from trade data (the API includes name/pseudonym per trade)
@@ -152,7 +152,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   const profileImage = trades[0]?.profileImage || null;
 
   // Upsert wallet FIRST (trades/activities have FK to wallets)
-  upsertWallet({
+  await upsertWallet({
     address,
     username,
     profile_image: profileImage,
@@ -174,10 +174,10 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   });
 
   // Clear old trades/activities and re-insert fresh data
-  clearTradesForWallet(address);
-  clearActivitiesForWallet(address);
+  await clearTradesForWallet(address);
+  await clearActivitiesForWallet(address);
 
-  insertTrades(
+  await insertTrades(
     trades.map((t) => ({
       wallet_address: address,
       condition_id: t.conditionId,
@@ -192,7 +192,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
     })),
   );
 
-  insertActivities(
+  await insertActivities(
     activities.map((a) => ({
       wallet_address: address,
       type: a.type,
@@ -212,7 +212,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
       .map(([name, s]) => `${name}: ${s.weighted.toFixed(1)}`)
       .join(', ');
 
-    insertAlert({
+    await insertAlert({
       wallet_address: address,
       alert_type: totalScore > 80 ? 'EXTREME' : 'HIGH',
       condition_id: null,

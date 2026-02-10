@@ -1,7 +1,7 @@
-import type Database from 'better-sqlite3';
+import type { Client } from '@libsql/client';
 
-export function initializeDatabase(db: Database.Database): void {
-  db.exec(`
+export async function initializeDatabase(db: Client): Promise<void> {
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS wallets (
       address TEXT PRIMARY KEY,
       username TEXT,
@@ -21,11 +21,13 @@ export function initializeDatabase(db: Database.Database): void {
       trade_count INTEGER DEFAULT 0,
       scored_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
+    )
+  `);
 
-    CREATE INDEX IF NOT EXISTS idx_wallets_score ON wallets(total_score DESC);
-    CREATE INDEX IF NOT EXISTS idx_wallets_scored_at ON wallets(scored_at);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_wallets_score ON wallets(total_score DESC)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_wallets_scored_at ON wallets(scored_at)`);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS trades (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet_address TEXT NOT NULL,
@@ -39,10 +41,12 @@ export function initializeDatabase(db: Database.Database): void {
       outcome TEXT,
       event_slug TEXT,
       FOREIGN KEY (wallet_address) REFERENCES wallets(address)
-    );
+    )
+  `);
 
-    CREATE INDEX IF NOT EXISTS idx_trades_wallet ON trades(wallet_address, timestamp DESC);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_trades_wallet ON trades(wallet_address, timestamp DESC)`);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS markets (
       condition_id TEXT PRIMARY KEY,
       event_id TEXT,
@@ -54,8 +58,10 @@ export function initializeDatabase(db: Database.Database): void {
       active INTEGER DEFAULT 1,
       volume REAL DEFAULT 0,
       cached_at INTEGER NOT NULL
-    );
+    )
+  `);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet_address TEXT NOT NULL,
@@ -65,11 +71,13 @@ export function initializeDatabase(db: Database.Database): void {
       score_at_time REAL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       FOREIGN KEY (wallet_address) REFERENCES wallets(address)
-    );
+    )
+  `);
 
-    CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_alerts_wallet ON alerts(wallet_address);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_alerts_wallet ON alerts(wallet_address)`);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS activities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       wallet_address TEXT NOT NULL,
@@ -80,8 +88,8 @@ export function initializeDatabase(db: Database.Database): void {
       timestamp INTEGER NOT NULL,
       side TEXT,
       FOREIGN KEY (wallet_address) REFERENCES wallets(address)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_activities_wallet ON activities(wallet_address, timestamp DESC);
+    )
   `);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_activities_wallet ON activities(wallet_address, timestamp DESC)`);
 }

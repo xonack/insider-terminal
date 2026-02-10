@@ -1,4 +1,4 @@
-import { getDb } from './index';
+import { ensureDb } from './index';
 
 export interface WalletRow {
   address: string;
@@ -71,212 +71,243 @@ export interface ActivityRow {
 
 // --- Wallet operations ---
 
-export function upsertWallet(wallet: WalletRow): void {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO wallets (
-      address, username, profile_image, total_score,
-      signal_wallet_age, signal_first_bet, signal_bet_timing,
-      signal_withdrawal_speed, signal_market_selection, signal_win_rate,
-      signal_no_hedging, total_volume, total_pnl,
-      first_trade_at, last_trade_at, trade_count, scored_at, created_at
-    ) VALUES (
-      @address, @username, @profile_image, @total_score,
-      @signal_wallet_age, @signal_first_bet, @signal_bet_timing,
-      @signal_withdrawal_speed, @signal_market_selection, @signal_win_rate,
-      @signal_no_hedging, @total_volume, @total_pnl,
-      @first_trade_at, @last_trade_at, @trade_count, @scored_at,
-      COALESCE(
-        (SELECT created_at FROM wallets WHERE address = @address),
-        @created_at
+export async function upsertWallet(wallet: WalletRow): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: `
+      INSERT OR REPLACE INTO wallets (
+        address, username, profile_image, total_score,
+        signal_wallet_age, signal_first_bet, signal_bet_timing,
+        signal_withdrawal_speed, signal_market_selection, signal_win_rate,
+        signal_no_hedging, total_volume, total_pnl,
+        first_trade_at, last_trade_at, trade_count, scored_at, created_at
+      ) VALUES (
+        ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?,
+        COALESCE(
+          (SELECT created_at FROM wallets WHERE address = ?),
+          ?
+        )
       )
-    )
-  `);
-  stmt.run(wallet);
+    `,
+    args: [
+      wallet.address, wallet.username, wallet.profile_image, wallet.total_score,
+      wallet.signal_wallet_age, wallet.signal_first_bet, wallet.signal_bet_timing,
+      wallet.signal_withdrawal_speed, wallet.signal_market_selection, wallet.signal_win_rate,
+      wallet.signal_no_hedging, wallet.total_volume, wallet.total_pnl,
+      wallet.first_trade_at, wallet.last_trade_at, wallet.trade_count, wallet.scored_at,
+      wallet.address,
+      wallet.created_at,
+    ],
+  });
 }
 
-export function getWallet(address: string): WalletRow | null {
-  const db = getDb();
-  const stmt = db.prepare('SELECT * FROM wallets WHERE address = ?');
-  return (stmt.get(address) as WalletRow | undefined) ?? null;
+export async function getWallet(address: string): Promise<WalletRow | null> {
+  const db = await ensureDb();
+  const result = await db.execute({
+    sql: 'SELECT * FROM wallets WHERE address = ?',
+    args: [address],
+  });
+  return (result.rows[0] as unknown as WalletRow | undefined) ?? null;
 }
 
-export function getLeaderboard(limit: number, offset: number, minScore?: number): WalletRow[] {
-  const db = getDb();
+export async function getLeaderboard(limit: number, offset: number, minScore?: number): Promise<WalletRow[]> {
+  const db = await ensureDb();
   if (minScore !== undefined) {
-    const stmt = db.prepare(
-      'SELECT * FROM wallets WHERE total_score >= ? ORDER BY total_score DESC LIMIT ? OFFSET ?'
-    );
-    return stmt.all(minScore, limit, offset) as WalletRow[];
+    const result = await db.execute({
+      sql: 'SELECT * FROM wallets WHERE total_score >= ? ORDER BY total_score DESC LIMIT ? OFFSET ?',
+      args: [minScore, limit, offset],
+    });
+    return result.rows as unknown as WalletRow[];
   }
-  const stmt = db.prepare(
-    'SELECT * FROM wallets ORDER BY total_score DESC LIMIT ? OFFSET ?'
-  );
-  return stmt.all(limit, offset) as WalletRow[];
+  const result = await db.execute({
+    sql: 'SELECT * FROM wallets ORDER BY total_score DESC LIMIT ? OFFSET ?',
+    args: [limit, offset],
+  });
+  return result.rows as unknown as WalletRow[];
 }
 
-export function getStaleWallets(maxAgeSeconds: number, limit: number): WalletRow[] {
-  const db = getDb();
+export async function getStaleWallets(maxAgeSeconds: number, limit: number): Promise<WalletRow[]> {
+  const db = await ensureDb();
   const cutoff = Math.floor(Date.now() / 1000) - maxAgeSeconds;
-  const stmt = db.prepare(
-    'SELECT * FROM wallets WHERE scored_at < ? ORDER BY scored_at ASC LIMIT ?'
-  );
-  return stmt.all(cutoff, limit) as WalletRow[];
+  const result = await db.execute({
+    sql: 'SELECT * FROM wallets WHERE scored_at < ? ORDER BY scored_at ASC LIMIT ?',
+    args: [cutoff, limit],
+  });
+  return result.rows as unknown as WalletRow[];
 }
 
-export function getWalletCount(): number {
-  const db = getDb();
-  const stmt = db.prepare('SELECT COUNT(*) as count FROM wallets');
-  const result = stmt.get() as { count: number };
-  return result.count;
+export async function getWalletCount(): Promise<number> {
+  const db = await ensureDb();
+  const result = await db.execute('SELECT COUNT(*) as count FROM wallets');
+  return Number(result.rows[0].count);
 }
 
 // --- Trade operations ---
 
-export function insertTrades(trades: TradeRow[]): void {
+export async function insertTrades(trades: TradeRow[]): Promise<void> {
   if (trades.length === 0) return;
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO trades (
-      wallet_address, condition_id, side, size, price,
-      timestamp, transaction_hash, title, outcome, event_slug
-    ) VALUES (
-      @wallet_address, @condition_id, @side, @size, @price,
-      @timestamp, @transaction_hash, @title, @outcome, @event_slug
-    )
-  `);
-  const insertMany = db.transaction((rows: TradeRow[]) => {
-    for (const row of rows) {
-      stmt.run(row);
-    }
-  });
-  insertMany(trades);
-}
-
-export function getTradesForWallet(address: string, limit?: number): TradeRow[] {
-  const db = getDb();
-  if (limit !== undefined) {
-    const stmt = db.prepare(
-      'SELECT * FROM trades WHERE wallet_address = ? ORDER BY timestamp DESC LIMIT ?'
-    );
-    return stmt.all(address, limit) as TradeRow[];
-  }
-  const stmt = db.prepare(
-    'SELECT * FROM trades WHERE wallet_address = ? ORDER BY timestamp DESC'
+  const db = await ensureDb();
+  await db.batch(
+    trades.map((t) => ({
+      sql: `
+        INSERT INTO trades (
+          wallet_address, condition_id, side, size, price,
+          timestamp, transaction_hash, title, outcome, event_slug
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [
+        t.wallet_address, t.condition_id, t.side, t.size, t.price,
+        t.timestamp, t.transaction_hash, t.title, t.outcome, t.event_slug,
+      ],
+    })),
   );
-  return stmt.all(address) as TradeRow[];
 }
 
-export function clearTradesForWallet(address: string): void {
-  const db = getDb();
-  const stmt = db.prepare('DELETE FROM trades WHERE wallet_address = ?');
-  stmt.run(address);
+export async function getTradesForWallet(address: string, limit?: number): Promise<TradeRow[]> {
+  const db = await ensureDb();
+  if (limit !== undefined) {
+    const result = await db.execute({
+      sql: 'SELECT * FROM trades WHERE wallet_address = ? ORDER BY timestamp DESC LIMIT ?',
+      args: [address, limit],
+    });
+    return result.rows as unknown as TradeRow[];
+  }
+  const result = await db.execute({
+    sql: 'SELECT * FROM trades WHERE wallet_address = ? ORDER BY timestamp DESC',
+    args: [address],
+  });
+  return result.rows as unknown as TradeRow[];
+}
+
+export async function clearTradesForWallet(address: string): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: 'DELETE FROM trades WHERE wallet_address = ?',
+    args: [address],
+  });
 }
 
 // --- Market operations ---
 
-export function upsertMarket(market: MarketRow): void {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO markets (
-      condition_id, event_id, title, slug, end_date,
-      resolved_at, outcome, active, volume, cached_at
-    ) VALUES (
-      @condition_id, @event_id, @title, @slug, @end_date,
-      @resolved_at, @outcome, @active, @volume, @cached_at
-    )
-  `);
-  stmt.run(market);
+export async function upsertMarket(market: MarketRow): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: `
+      INSERT OR REPLACE INTO markets (
+        condition_id, event_id, title, slug, end_date,
+        resolved_at, outcome, active, volume, cached_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    args: [
+      market.condition_id, market.event_id, market.title, market.slug, market.end_date,
+      market.resolved_at, market.outcome, market.active, market.volume, market.cached_at,
+    ],
+  });
 }
 
-export function getMarket(conditionId: string): MarketRow | null {
-  const db = getDb();
-  const stmt = db.prepare('SELECT * FROM markets WHERE condition_id = ?');
-  return (stmt.get(conditionId) as MarketRow | undefined) ?? null;
+export async function getMarket(conditionId: string): Promise<MarketRow | null> {
+  const db = await ensureDb();
+  const result = await db.execute({
+    sql: 'SELECT * FROM markets WHERE condition_id = ?',
+    args: [conditionId],
+  });
+  return (result.rows[0] as unknown as MarketRow | undefined) ?? null;
 }
 
-export function getStaleMarkets(maxAgeSeconds: number): MarketRow[] {
-  const db = getDb();
+export async function getStaleMarkets(maxAgeSeconds: number): Promise<MarketRow[]> {
+  const db = await ensureDb();
   const cutoff = Math.floor(Date.now() / 1000) - maxAgeSeconds;
-  const stmt = db.prepare(
-    'SELECT * FROM markets WHERE cached_at < ? ORDER BY cached_at ASC'
-  );
-  return stmt.all(cutoff) as MarketRow[];
+  const result = await db.execute({
+    sql: 'SELECT * FROM markets WHERE cached_at < ? ORDER BY cached_at ASC',
+    args: [cutoff],
+  });
+  return result.rows as unknown as MarketRow[];
 }
 
 // --- Alert operations ---
 
-export function insertAlert(alert: Omit<AlertRow, 'id' | 'created_at'>): void {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO alerts (wallet_address, alert_type, condition_id, details, score_at_time)
-    VALUES (@wallet_address, @alert_type, @condition_id, @details, @score_at_time)
-  `);
-  stmt.run(alert);
+export async function insertAlert(alert: Omit<AlertRow, 'id' | 'created_at'>): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: `
+      INSERT INTO alerts (wallet_address, alert_type, condition_id, details, score_at_time)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    args: [alert.wallet_address, alert.alert_type, alert.condition_id, alert.details, alert.score_at_time],
+  });
 }
 
-export function getAlerts(limit: number, offset: number, type?: string): AlertRow[] {
-  const db = getDb();
+export async function getAlerts(limit: number, offset: number, type?: string): Promise<AlertRow[]> {
+  const db = await ensureDb();
   if (type !== undefined) {
-    const stmt = db.prepare(
-      'SELECT * FROM alerts WHERE alert_type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    );
-    return stmt.all(type, limit, offset) as AlertRow[];
+    const result = await db.execute({
+      sql: 'SELECT * FROM alerts WHERE alert_type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      args: [type, limit, offset],
+    });
+    return result.rows as unknown as AlertRow[];
   }
-  const stmt = db.prepare(
-    'SELECT * FROM alerts ORDER BY created_at DESC LIMIT ? OFFSET ?'
-  );
-  return stmt.all(limit, offset) as AlertRow[];
+  const result = await db.execute({
+    sql: 'SELECT * FROM alerts ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    args: [limit, offset],
+  });
+  return result.rows as unknown as AlertRow[];
 }
 
-export function getAlertsForWallet(address: string): AlertRow[] {
-  const db = getDb();
-  const stmt = db.prepare(
-    'SELECT * FROM alerts WHERE wallet_address = ? ORDER BY created_at DESC'
-  );
-  return stmt.all(address) as AlertRow[];
+export async function getAlertsForWallet(address: string): Promise<AlertRow[]> {
+  const db = await ensureDb();
+  const result = await db.execute({
+    sql: 'SELECT * FROM alerts WHERE wallet_address = ? ORDER BY created_at DESC',
+    args: [address],
+  });
+  return result.rows as unknown as AlertRow[];
 }
 
-export function getAlertCount(): number {
-  const db = getDb();
-  const stmt = db.prepare('SELECT COUNT(*) as count FROM alerts');
-  const result = stmt.get() as { count: number };
-  return result.count;
+export async function getAlertCount(): Promise<number> {
+  const db = await ensureDb();
+  const result = await db.execute('SELECT COUNT(*) as count FROM alerts');
+  return Number(result.rows[0].count);
 }
 
 // --- Activity operations ---
 
-export function insertActivities(activities: ActivityRow[]): void {
+export async function insertActivities(activities: ActivityRow[]): Promise<void> {
   if (activities.length === 0) return;
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO activities (wallet_address, type, condition_id, size, usdc_size, timestamp, side)
-    VALUES (@wallet_address, @type, @condition_id, @size, @usdc_size, @timestamp, @side)
-  `);
-  const insertMany = db.transaction((rows: ActivityRow[]) => {
-    for (const row of rows) {
-      stmt.run(row);
-    }
-  });
-  insertMany(activities);
-}
-
-export function getActivitiesForWallet(address: string, type?: string): ActivityRow[] {
-  const db = getDb();
-  if (type !== undefined) {
-    const stmt = db.prepare(
-      'SELECT * FROM activities WHERE wallet_address = ? AND type = ? ORDER BY timestamp DESC'
-    );
-    return stmt.all(address, type) as ActivityRow[];
-  }
-  const stmt = db.prepare(
-    'SELECT * FROM activities WHERE wallet_address = ? ORDER BY timestamp DESC'
+  const db = await ensureDb();
+  await db.batch(
+    activities.map((a) => ({
+      sql: `
+        INSERT INTO activities (wallet_address, type, condition_id, size, usdc_size, timestamp, side)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [a.wallet_address, a.type, a.condition_id, a.size, a.usdc_size, a.timestamp, a.side],
+    })),
   );
-  return stmt.all(address) as ActivityRow[];
 }
 
-export function clearActivitiesForWallet(address: string): void {
-  const db = getDb();
-  const stmt = db.prepare('DELETE FROM activities WHERE wallet_address = ?');
-  stmt.run(address);
+export async function getActivitiesForWallet(address: string, type?: string): Promise<ActivityRow[]> {
+  const db = await ensureDb();
+  if (type !== undefined) {
+    const result = await db.execute({
+      sql: 'SELECT * FROM activities WHERE wallet_address = ? AND type = ? ORDER BY timestamp DESC',
+      args: [address, type],
+    });
+    return result.rows as unknown as ActivityRow[];
+  }
+  const result = await db.execute({
+    sql: 'SELECT * FROM activities WHERE wallet_address = ? ORDER BY timestamp DESC',
+    args: [address],
+  });
+  return result.rows as unknown as ActivityRow[];
+}
+
+export async function clearActivitiesForWallet(address: string): Promise<void> {
+  const db = await ensureDb();
+  await db.execute({
+    sql: 'DELETE FROM activities WHERE wallet_address = ?',
+    args: [address],
+  });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getActiveMarkets } from '@/lib/polymarket/gamma';
-import { getDb } from '@/lib/db/index';
+import { ensureDb } from '@/lib/db/index';
 
 export const runtime = 'nodejs';
 
@@ -30,28 +30,33 @@ export async function GET() {
     });
 
     // 3. Check trades table for suspicious wallet activity on these markets
-    const db = getDb();
-    const stmt = db.prepare(`
-      SELECT DISTINCT t.wallet_address
-      FROM trades t
-      INNER JOIN wallets w ON w.address = t.wallet_address
-      WHERE t.condition_id = ?
-        AND w.total_score > 60
-    `);
+    const db = await ensureDb();
 
-    const result: MarketWithInsiderActivity[] = soonResolving.map((m) => {
-      const rows = stmt.all(m.conditionId) as Array<{ wallet_address: string }>;
-      return {
-        conditionId: m.conditionId,
-        title: m.title,
-        slug: m.slug,
-        endDate: m.endDate,
-        volume: m.volumeNum,
-        active: m.active,
-        insiderCount: rows.length,
-        insiderAddresses: rows.map((r) => r.wallet_address),
-      };
-    });
+    const result: MarketWithInsiderActivity[] = await Promise.all(
+      soonResolving.map(async (m) => {
+        const queryResult = await db.execute({
+          sql: `
+            SELECT DISTINCT t.wallet_address
+            FROM trades t
+            INNER JOIN wallets w ON w.address = t.wallet_address
+            WHERE t.condition_id = ?
+              AND w.total_score > 60
+          `,
+          args: [m.conditionId],
+        });
+        const rows = queryResult.rows as unknown as Array<{ wallet_address: string }>;
+        return {
+          conditionId: m.conditionId,
+          title: m.title,
+          slug: m.slug,
+          endDate: m.endDate,
+          volume: m.volumeNum,
+          active: m.active,
+          insiderCount: rows.length,
+          insiderAddresses: rows.map((r) => r.wallet_address),
+        };
+      }),
+    );
 
     return NextResponse.json({
       markets: result,

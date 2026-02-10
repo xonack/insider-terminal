@@ -28,13 +28,13 @@ export async function GET(
   const normalizedAddress = address.toLowerCase();
 
   try {
-    // 1. Check SQLite cache
-    const cached = getWallet(normalizedAddress);
+    // 1. Check DB cache
+    const cached = await getWallet(normalizedAddress);
     const now = Math.floor(Date.now() / 1000);
 
     if (cached && now - cached.scored_at < CACHE_TTL.walletScore) {
-      const trades = getTradesForWallet(normalizedAddress, 50);
-      const alerts = getAlertsForWallet(normalizedAddress);
+      const trades = await getTradesForWallet(normalizedAddress, 50);
+      const alerts = await getAlertsForWallet(normalizedAddress);
       const band = getScoreBand(cached.total_score);
 
       return NextResponse.json({
@@ -68,10 +68,10 @@ export async function GET(
 
     // 2. Score the wallet
     const result = await scoreWallet(normalizedAddress);
-    const trades = getTradesForWallet(normalizedAddress, 50);
-    const alerts = getAlertsForWallet(normalizedAddress);
+    const trades = await getTradesForWallet(normalizedAddress, 50);
+    const alerts = await getAlertsForWallet(normalizedAddress);
     const band = getScoreBand(result.totalScore);
-    const wallet = getWallet(normalizedAddress);
+    const wallet = await getWallet(normalizedAddress);
 
     return NextResponse.json({
       address: normalizedAddress,

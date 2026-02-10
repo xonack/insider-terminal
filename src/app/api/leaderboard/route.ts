@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
   const minScore = Math.max(parseInt(searchParams.get('minScore') ?? '0', 10) || 0, 0);
 
   try {
-    const wallets = getLeaderboard(limit, offset, minScore > 0 ? minScore : undefined);
-    const total = getWalletCount();
+    const wallets = await getLeaderboard(limit, offset, minScore > 0 ? minScore : undefined);
+    const total = await getWalletCount();
 
     // Check if data is stale (any wallet scored more than walletScore TTL ago)
-    const staleWallets = getStaleWallets(CACHE_TTL.walletScore, 1);
+    const staleWallets = await getStaleWallets(CACHE_TTL.walletScore, 1);
     const hasStaleData = total === 0 || staleWallets.length > 0;
 
     return NextResponse.json({
