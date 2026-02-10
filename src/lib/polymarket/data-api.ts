@@ -10,7 +10,7 @@ import type {
 
 export async function getTrades(
   address: string,
-  limit: number = 100,
+  limit: number = 1000,
 ): Promise<PolymarketTrade[]> {
   // The Polymarket Data API uses proxyWallet as the primary query param
   const params = new URLSearchParams({ proxyWallet: address, limit: String(limit) });
