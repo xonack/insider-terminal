@@ -6,7 +6,7 @@ import { CACHE_TTL } from '@/lib/utils/constants';
 
 export const runtime = 'nodejs';
 
-const MAX_WALLETS_PER_SCAN = 10;
+const MAX_WALLETS_PER_SCAN = 25;
 
 export async function POST(request: NextRequest) {
   const force = request.nextUrl.searchParams.get('force') === 'true';
