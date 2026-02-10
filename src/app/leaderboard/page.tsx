@@ -233,8 +233,8 @@ export default function LeaderboardPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-terminal-border">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-2 gap-2 border-b border-terminal-border">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <h1 className="text-terminal-green text-xs uppercase tracking-wider font-bold">
             Insider Leaderboard
           </h1>
@@ -249,9 +249,9 @@ export default function LeaderboardPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {scanResult && (
-            <span className="text-terminal-muted text-[10px] max-w-[300px] truncate">
+            <span className="text-terminal-muted text-[10px] max-w-[200px] sm:max-w-[300px] truncate flex-1 sm:flex-none">
               {scanResult}
             </span>
           )}
@@ -259,7 +259,7 @@ export default function LeaderboardPage() {
             type="button"
             onClick={handleScan}
             disabled={scanning}
-            className="px-3 py-1 text-[10px] uppercase tracking-wider font-bold border border-terminal-green text-terminal-green hover:bg-terminal-green/10 disabled:opacity-50 disabled:cursor-wait transition-colors"
+            className="px-3 py-2 sm:py-1 text-[10px] uppercase tracking-wider font-bold border border-terminal-green text-terminal-green hover:bg-terminal-green/10 disabled:opacity-50 disabled:cursor-wait transition-colors min-h-[44px] sm:min-h-0"
           >
             {scanning ? "SCANNING..." : "SCAN"}
           </button>
@@ -273,14 +273,15 @@ export default function LeaderboardPage() {
             Error loading leaderboard: {error instanceof Error ? error.message : "Unknown error"}
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="sticky top-0 bg-terminal-panel z-10">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
+              <thead className="sticky top-0 bg-terminal-panel z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className={`text-left ${
+                      className={`text-left px-2 py-2 ${
                         header.column.getCanSort()
                           ? "cursor-pointer select-none hover:text-terminal-text"
                           : ""
@@ -343,7 +344,7 @@ export default function LeaderboardPage() {
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className={`${
+                        className={`px-2 ${
                           ["total_volume", "total_pnl", "trade_count"].includes(
                             cell.column.id,
                           )
@@ -362,13 +363,14 @@ export default function LeaderboardPage() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
       {/* Pagination */}
       {data && data.total > limit && (
-        <div className="flex items-center justify-between px-4 py-1 border-t border-terminal-border text-[10px] text-terminal-muted">
-          <span>
+        <div className="flex items-center justify-between px-4 py-2 sm:py-1 border-t border-terminal-border text-[10px] text-terminal-muted">
+          <span className="text-xs sm:text-[10px]">
             Page {currentPage} of {totalPages}
           </span>
           <div className="flex items-center gap-2">
@@ -376,7 +378,7 @@ export default function LeaderboardPage() {
               type="button"
               onClick={() => setOffset(Math.max(0, offset - limit))}
               disabled={offset === 0}
-              className="px-2 py-0.5 border border-terminal-border text-terminal-muted hover:text-terminal-text disabled:opacity-30 disabled:cursor-not-allowed"
+              className="px-3 py-2 sm:px-2 sm:py-0.5 border border-terminal-border text-terminal-muted hover:text-terminal-text disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
             >
               PREV
             </button>
@@ -384,7 +386,7 @@ export default function LeaderboardPage() {
               type="button"
               onClick={() => setOffset(offset + limit)}
               disabled={offset + limit >= data.total}
-              className="px-2 py-0.5 border border-terminal-border text-terminal-muted hover:text-terminal-text disabled:opacity-30 disabled:cursor-not-allowed"
+              className="px-3 py-2 sm:px-2 sm:py-0.5 border border-terminal-border text-terminal-muted hover:text-terminal-text disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
             >
               NEXT
             </button>

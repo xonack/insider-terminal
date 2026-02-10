@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TerminalBoot } from "@/components/onboarding/TerminalBoot";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { Menu, X } from "lucide-react";
 
 interface StatusData {
   wallets: number;
@@ -63,6 +64,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useLocalStorage(ONBOARDING_KEY, false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: status } = useQuery<StatusData>({
     queryKey: ["status"],
@@ -86,14 +88,24 @@ export function TerminalShell({ children }: TerminalShellProps) {
         <TerminalBoot onDismiss={() => setDismissed(true)} />
       )}
 
-      <div className="h-screen w-screen grid grid-rows-[36px_1fr_28px] grid-cols-[200px_1fr] overflow-hidden">
+      <div className="h-screen w-screen grid grid-rows-[36px_1fr_28px_44px] md:grid-rows-[36px_1fr_28px] grid-cols-1 md:grid-cols-[200px_1fr] overflow-hidden">
         {/* Top bar */}
-        <header className="col-span-2 flex items-center justify-between px-4 border-b border-terminal-border bg-terminal-panel">
+        <header className="col-span-full flex items-center justify-between px-4 border-b border-terminal-border bg-terminal-panel">
           <div className="flex items-center gap-3">
-            <span className="text-terminal-green text-sm font-bold tracking-wider">
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="md:hidden text-terminal-green p-1 hover:bg-terminal-surface"
+              aria-label="Toggle menu"
+            >
+              {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+
+            <span className="text-terminal-green text-sm md:text-sm font-bold tracking-wider">
               INSIDER TERMINAL
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="hidden sm:flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-terminal-green opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-terminal-green" />
@@ -106,8 +118,8 @@ export function TerminalShell({ children }: TerminalShellProps) {
           <Clock />
         </header>
 
-        {/* Sidebar */}
-        <nav className="row-start-2 border-r border-terminal-border bg-terminal-panel flex flex-col pt-2">
+        {/* Desktop Sidebar */}
+        <nav className="hidden md:flex row-start-2 border-r border-terminal-border bg-terminal-panel flex-col pt-2">
           {NAV_ITEMS.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -134,19 +146,79 @@ export function TerminalShell({ children }: TerminalShellProps) {
           })}
         </nav>
 
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <nav
+              className="absolute left-0 top-[36px] bottom-[72px] w-64 bg-terminal-panel border-r border-terminal-border flex flex-col pt-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {NAV_ITEMS.map((item) => {
+                const isActive =
+                  pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-wider transition-colors ${
+                      isActive
+                        ? "text-terminal-orange bg-terminal-surface border-l-2 border-terminal-orange"
+                        : "text-terminal-muted hover:text-terminal-text border-l-2 border-transparent"
+                    }`}
+                  >
+                    <span className="font-bold">{item.label}</span>
+                    <span
+                      className={`text-[10px] ${
+                        isActive ? "text-terminal-orange/70" : "text-terminal-dim"
+                      }`}
+                    >
+                      {item.description}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+
         {/* Content area */}
-        <main className="row-start-2 col-start-2 overflow-auto bg-terminal-bg">
+        <main className="row-start-2 col-start-1 md:col-start-2 overflow-auto bg-terminal-bg">
           {children}
         </main>
 
         {/* Status bar */}
-        <footer className="col-span-2 flex items-center px-4 text-[10px] text-terminal-dim border-t border-terminal-border bg-terminal-panel uppercase tracking-wider">
-          <span>Wallets: {status?.wallets ?? "---"}</span>
-          <span className="mx-3">|</span>
-          <span>Alerts: {status?.alerts ?? "---"}</span>
-          <span className="mx-3">|</span>
-          <span>Last Scan: {status ? formatScanTime(status.lastScan) : "---"}</span>
+        <footer className="col-span-full flex items-center px-4 text-[10px] text-terminal-dim border-t border-terminal-border bg-terminal-panel uppercase tracking-wider overflow-x-auto">
+          <span className="whitespace-nowrap">Wallets: {status?.wallets ?? "---"}</span>
+          <span className="mx-2 md:mx-3">|</span>
+          <span className="whitespace-nowrap">Alerts: {status?.alerts ?? "---"}</span>
+          <span className="mx-2 md:mx-3">|</span>
+          <span className="whitespace-nowrap">Last Scan: {status ? formatScanTime(status.lastScan) : "---"}</span>
         </footer>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden col-span-full flex items-center justify-around border-t border-terminal-border bg-terminal-panel">
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center justify-center py-2 px-3 text-[10px] uppercase tracking-wider transition-colors min-h-[44px] ${
+                  isActive
+                    ? "text-terminal-orange"
+                    : "text-terminal-muted"
+                }`}
+              >
+                <span className="font-bold">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </>
   );
