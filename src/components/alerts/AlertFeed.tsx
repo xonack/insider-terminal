@@ -37,8 +37,18 @@ export function AlertFeed({ typeFilter }: AlertFeedProps) {
 
   if (!data || data.alerts.length === 0) {
     return (
-      <div className="p-4 text-terminal-dim text-xs font-mono text-center mt-8">
-        No alerts detected yet. Run a scan to start monitoring.
+      <div className="p-4 text-terminal-dim text-xs font-mono text-center mt-8 max-w-md mx-auto">
+        <p className="mb-3">No alerts detected yet.</p>
+        <p className="text-terminal-muted leading-relaxed">
+          Alerts trigger when a wallet scores above <span className="text-terminal-orange font-bold">60/100</span> on
+          the insider probability index. The system scans wallets automatically every 10 minutes, scoring 7 behavioral
+          signals: wallet age, first bet size, bet timing vs resolution, withdrawal speed, market selection,
+          win rate, and hedging patterns.
+        </p>
+        <div className="mt-3 flex items-center justify-center gap-4 text-[10px] uppercase tracking-wider">
+          <span className="text-terminal-orange">61-80 HIGH</span>
+          <span className="text-terminal-red">81-100 EXTREME</span>
+        </div>
       </div>
     );
   }
