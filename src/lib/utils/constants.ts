@@ -1,5 +1,19 @@
 export const POLYMARKET_DATA_API = 'https://data-api.polymarket.com';
 export const POLYMARKET_GAMMA_API = 'https://gamma-api.polymarket.com';
+export const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
+
+export type MarketSource = 'polymarket' | 'kalshi';
+export const VALID_SOURCES: readonly string[] = ['polymarket', 'kalshi'] as const;
+
+export function parseSource(value: string | null): MarketSource | undefined {
+  if (!value) return undefined;
+  if (VALID_SOURCES.includes(value)) return value as MarketSource;
+  return undefined;
+}
+
+export function validateSource(value: string | null): MarketSource {
+  return parseSource(value) ?? 'polymarket';
+}
 
 export const SIGNAL_WEIGHTS = {
   walletAge: 15,

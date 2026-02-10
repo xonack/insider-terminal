@@ -1,5 +1,7 @@
 import { getTrades, getPositions, getActivity } from '@/lib/polymarket/data-api';
 import { getMarketBySlug } from '@/lib/polymarket/gamma';
+import { getFills as getKalshiFills, getPositions as getKalshiPositions, getMarket as getKalshiMarket } from '@/lib/kalshi/data-api';
+import type { KalshiFill, KalshiMarketPosition } from '@/lib/kalshi/types';
 import {
   upsertWallet,
   getMarket as getMarketFromDb,
@@ -10,9 +12,9 @@ import {
   clearTradesForWallet,
   clearActivitiesForWallet,
 } from '@/lib/db/queries';
-import type { MarketRow } from '@/lib/db/queries';
+import type { MarketRow, MarketSource } from '@/lib/db/queries';
 import { SIGNAL_WEIGHTS, CACHE_TTL } from '@/lib/utils/constants';
-import type { PolymarketTrade } from '@/lib/polymarket/types';
+import type { PolymarketTrade, PolymarketPosition, PolymarketActivity } from '@/lib/polymarket/types';
 import type { ScoringResult, SignalResults } from './types';
 import { isoToUnix, nowUnix, sortTradesByTime, tradeUsdValue } from './utils';
 import { scoreWalletAge } from './signals/wallet-age';
@@ -23,15 +25,70 @@ import { scoreMarketSelection } from './signals/market-selection';
 import { scoreWinRate } from './signals/win-rate';
 import { scoreNoHedging } from './signals/no-hedging';
 
+// --- Kalshi → Polymarket normalizers ---
+
+/** Convert Kalshi fill to PolymarketTrade shape for signal compatibility. */
+function normalizeKalshiFill(fill: KalshiFill): PolymarketTrade {
+  // Kalshi prices are in cents, normalize to 0-1 range
+  const price = fill.yes_price / 100;
+  return {
+    proxyWallet: '', // Kalshi uses user IDs, not wallets
+    side: fill.action === 'buy' ? 'BUY' : 'SELL',
+    asset: fill.ticker,
+    conditionId: fill.ticker,
+    size: fill.count,
+    price,
+    timestamp: Math.floor(new Date(fill.created_time).getTime() / 1000),
+    title: fill.ticker,
+    slug: fill.ticker,
+    outcome: fill.side, // 'yes' or 'no'
+    outcomeIndex: fill.side === 'yes' ? 0 : 1,
+    transactionHash: fill.fill_id,
+  };
+}
+
+/** Convert Kalshi market position to PolymarketPosition shape. */
+function normalizeKalshiPosition(pos: KalshiMarketPosition): PolymarketPosition {
+  // Kalshi values are in cents, convert to dollars
+  return {
+    proxyWallet: '',
+    asset: pos.ticker,
+    conditionId: pos.ticker,
+    size: Math.abs(pos.position),
+    avgPrice: 0,
+    curPrice: 0,
+    initialValue: pos.total_traded / 100,
+    currentValue: pos.market_exposure / 100,
+    cashPnl: 0,
+    realizedPnl: pos.realized_pnl / 100,
+    percentPnl: 0,
+    percentRealizedPnl: 0,
+    totalBought: pos.total_traded / 100,
+    outcome: pos.position > 0 ? 'Yes' : 'No',
+    outcomeIndex: pos.position > 0 ? 0 : 1,
+    oppositeOutcome: pos.position > 0 ? 'No' : 'Yes',
+    oppositeAsset: '',
+    title: pos.ticker,
+    slug: pos.ticker,
+    icon: '',
+    eventId: '',
+    eventSlug: '',
+    endDate: '',
+    redeemable: false,
+    mergeable: false,
+    negativeRisk: false,
+  };
+}
+
+// --- Market cache builders ---
+
 /**
- * Fetch and cache market metadata for each unique market in the trade list.
- * Returns a Map of conditionId -> MarketRow for use by signal functions.
+ * Fetch and cache market metadata for Polymarket trades.
  */
-async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, MarketRow>> {
+async function buildPolymarketCache(trades: PolymarketTrade[], source: MarketSource): Promise<Map<string, MarketRow>> {
   const cache = new Map<string, MarketRow>();
   const now = nowUnix();
 
-  // Build a map of conditionId -> slug from trade data
   const slugMap = new Map<string, string>();
   for (const t of trades) {
     if (t.conditionId && t.slug && !slugMap.has(t.conditionId)) {
@@ -39,7 +96,6 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
     }
   }
 
-  // First pass: load all cached markets from DB
   const toFetch: Array<{ conditionId: string; slug: string }> = [];
   for (const [conditionId, slug] of slugMap) {
     const cached = await getMarketFromDb(conditionId);
@@ -50,7 +106,6 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
     }
   }
 
-  // Second pass: fetch uncached markets via slug lookup (batches of 5)
   const BATCH_SIZE = 5;
   for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
     const batch = toFetch.slice(i, i + BATCH_SIZE);
@@ -63,7 +118,6 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
       if (result.status !== 'fulfilled' || !result.value) continue;
 
       const apiMarket = result.value;
-      // Gamma API uses 'question' not 'title'
       const title = apiMarket.title || apiMarket.question || batch[j].slug;
 
       const row: MarketRow = {
@@ -76,6 +130,7 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
         outcome: apiMarket.resolution || null,
         active: apiMarket.active ? 1 : 0,
         volume: apiMarket.volumeNum ?? 0,
+        market_source: source,
         cached_at: now,
       };
 
@@ -88,9 +143,71 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
 }
 
 /**
- * Score a wallet address for insider trading signals.
+ * Fetch and cache market metadata for Kalshi trades.
+ */
+async function buildKalshiCache(trades: PolymarketTrade[], source: MarketSource): Promise<Map<string, MarketRow>> {
+  const cache = new Map<string, MarketRow>();
+  const now = nowUnix();
+
+  const tickers = new Set<string>();
+  for (const t of trades) {
+    if (t.conditionId && !tickers.has(t.conditionId)) {
+      tickers.add(t.conditionId);
+    }
+  }
+
+  const toFetch: string[] = [];
+  for (const ticker of tickers) {
+    const cached = await getMarketFromDb(ticker);
+    if (cached && now - cached.cached_at < CACHE_TTL.marketMetadata) {
+      cache.set(ticker, cached);
+    } else {
+      toFetch.push(ticker);
+    }
+  }
+
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+    const batch = toFetch.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((ticker) => getKalshiMarket(ticker)),
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      if (result.status !== 'fulfilled' || !result.value) continue;
+
+      const apiMarket = result.value;
+      const isSettled = apiMarket.status === 'settled' || apiMarket.status === 'closed';
+
+      const row: MarketRow = {
+        condition_id: apiMarket.ticker,
+        event_id: apiMarket.event_ticker || null,
+        title: apiMarket.title,
+        slug: apiMarket.ticker,
+        end_date: isoToUnix(apiMarket.close_time),
+        resolved_at: isSettled ? isoToUnix(apiMarket.updated_time) : null,
+        outcome: apiMarket.result || null,
+        active: apiMarket.status === 'open' ? 1 : 0,
+        volume: parseFloat(apiMarket.volume_fp) || 0,
+        market_source: source,
+        cached_at: now,
+      };
+
+      await upsertMarket(row);
+      cache.set(batch[j], row);
+    }
+  }
+
+  return cache;
+}
+
+// --- Main scoring function ---
+
+/**
+ * Score a wallet/user for insider trading signals.
  *
- * 1. Fetch all wallet data from Polymarket APIs
+ * 1. Fetch all data from the appropriate market API
  * 2. Fetch and cache market metadata
  * 3. Run all 7 signals
  * 4. Compute weighted composite score
@@ -98,16 +215,39 @@ async function buildMarketCache(trades: PolymarketTrade[]): Promise<Map<string, 
  * 6. Generate alerts if score > 60
  * 7. Return ScoringResult
  */
-export async function scoreWallet(address: string): Promise<ScoringResult> {
-  // 1. Fetch wallet data (profile endpoint is unreliable/404, skip it)
-  const [trades, positions, activities] = await Promise.all([
-    getTrades(address),
-    getPositions(address),
-    getActivity(address),
-  ]);
+export async function scoreWallet(
+  address: string,
+  source: MarketSource = 'polymarket',
+): Promise<ScoringResult> {
+  let trades: PolymarketTrade[];
+  let positions: PolymarketPosition[];
+  let activities: PolymarketActivity[];
+  let marketCache: Map<string, MarketRow>;
 
-  // 2. Build market cache
-  const marketCache = await buildMarketCache(trades);
+  if (source === 'kalshi') {
+    // Fetch from Kalshi and normalize to Polymarket shapes
+    const [kalshiFills, kalshiPositions] = await Promise.all([
+      getKalshiFills(undefined, 300),
+      getKalshiPositions(),
+    ]);
+
+    trades = kalshiFills.map(normalizeKalshiFill);
+    positions = kalshiPositions.map(normalizeKalshiPosition);
+    activities = []; // Kalshi doesn't have separate activity feed
+    marketCache = await buildKalshiCache(trades, source);
+  } else {
+    // Polymarket (default)
+    const [polyTrades, polyPositions, polyActivities] = await Promise.all([
+      getTrades(address),
+      getPositions(address),
+      getActivity(address),
+    ]);
+
+    trades = polyTrades;
+    positions = polyPositions;
+    activities = polyActivities;
+    marketCache = await buildPolymarketCache(trades, source);
+  }
 
   // 3. Run all 7 signals
   const signals: SignalResults = {
@@ -136,7 +276,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   const totalVolume = trades.reduce((sum, t) => sum + tradeUsdValue(t), 0);
   const totalPnl = positions.reduce((sum, p) => sum + (Number(p.realizedPnl) || 0) + (Number(p.cashPnl) || 0), 0);
 
-  console.log(`[scoreWallet] ${address.slice(0, 10)}… | positions: ${positions.length} | totalPnl: ${totalPnl.toFixed(2)} | sample:`, positions.length > 0 ? { cashPnl: positions[0].cashPnl, realizedPnl: positions[0].realizedPnl, types: { cashPnl: typeof positions[0].cashPnl, realizedPnl: typeof positions[0].realizedPnl } } : 'none');
+  console.log(`[scoreWallet] ${address.slice(0, 10)}… [${source}] | positions: ${positions.length} | totalPnl: ${totalPnl.toFixed(2)} | sample:`, positions.length > 0 ? { cashPnl: positions[0].cashPnl, realizedPnl: positions[0].realizedPnl, types: { cashPnl: typeof positions[0].cashPnl, realizedPnl: typeof positions[0].realizedPnl } } : 'none');
 
   const metadata = {
     totalVolume,
@@ -149,11 +289,9 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   // 5. Store in DB
   const now = nowUnix();
 
-  // Extract username from trade data (the API includes name/pseudonym per trade)
   const username = trades[0]?.name || trades[0]?.pseudonym || null;
   const profileImage = trades[0]?.profileImage || null;
 
-  // Upsert wallet FIRST (trades/activities have FK to wallets)
   await upsertWallet({
     address,
     username,
@@ -171,6 +309,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
     first_trade_at: metadata.firstTradeAt,
     last_trade_at: metadata.lastTradeAt,
     trade_count: metadata.tradeCount,
+    market_source: source,
     scored_at: now,
     created_at: now,
   });
@@ -191,6 +330,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
       title: t.title || null,
       outcome: t.outcome || null,
       event_slug: t.eventSlug || null,
+      market_source: source,
     })),
   );
 
@@ -218,7 +358,7 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
       wallet_address: address,
       alert_type: totalScore > 80 ? 'EXTREME' : 'HIGH',
       condition_id: null,
-      details: `Score ${totalScore}/100. Top signals: ${topSignals}`,
+      details: `[${source}] Score ${totalScore}/100. Top signals: ${topSignals}`,
       score_at_time: totalScore,
     });
   }

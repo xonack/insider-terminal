@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWallet, getTradesForWallet, getAlertsForWallet } from '@/lib/db/queries';
 import { scoreWallet } from '@/lib/scoring/engine';
-import { CACHE_TTL, SCORE_BANDS } from '@/lib/utils/constants';
+import { CACHE_TTL, SCORE_BANDS, VALID_SOURCES, validateSource } from '@/lib/utils/constants';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +24,12 @@ export async function GET(
     return NextResponse.json({ error: 'Address is required' }, { status: 400 });
   }
 
+  const sourceParam = _request.nextUrl.searchParams.get('source');
+  if (sourceParam && !VALID_SOURCES.includes(sourceParam)) {
+    return NextResponse.json({ error: 'Invalid source. Must be: polymarket, kalshi' }, { status: 400 });
+  }
+  const source = validateSource(sourceParam);
+
   // Normalize address to lowercase
   const normalizedAddress = address.toLowerCase();
 
@@ -40,6 +46,7 @@ export async function GET(
 
       return NextResponse.json({
         address: normalizedAddress,
+        source: cached.market_source,
         totalScore: cached.total_score,
         band,
         signals: {
@@ -68,7 +75,7 @@ export async function GET(
     }
 
     // 2. Score the wallet
-    const result = await scoreWallet(normalizedAddress);
+    const result = await scoreWallet(normalizedAddress, source);
     const trades = await getTradesForWallet(normalizedAddress, 50);
     const alerts = await getAlertsForWallet(normalizedAddress);
     const band = getScoreBand(result.totalScore);
@@ -76,6 +83,7 @@ export async function GET(
 
     return NextResponse.json({
       address: normalizedAddress,
+      source,
       totalScore: result.totalScore,
       band,
       signals: result.signals,

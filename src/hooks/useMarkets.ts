@@ -6,6 +6,7 @@ export interface MarketWithInsiderActivity {
   conditionId: string;
   title: string;
   slug: string;
+  source: "polymarket" | "kalshi";
   traderCount: number;
   totalVolume: number;
   tradeCount: number;

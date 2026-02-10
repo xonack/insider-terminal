@@ -9,6 +9,7 @@ import { TradeTimeline } from "@/components/wallet/TradeTimeline";
 
 interface WalletApiResponse {
   address: string;
+  source?: "polymarket" | "kalshi";
   totalScore: number;
   band: {
     min: number;
@@ -58,6 +59,7 @@ interface TradeData {
   title: string | null;
   outcome: string | null;
   event_slug: string | null;
+  market_source?: "polymarket" | "kalshi";
 }
 
 interface AlertData {
@@ -154,7 +156,7 @@ function NotFoundState({ address }: { address: string }) {
           Wallet Not Found
         </h2>
         <p className="text-xs text-terminal-muted mb-1">
-          No Polymarket activity found for this address.
+          No trading activity found for this address.
         </p>
         <p className="text-[10px] text-terminal-dim mb-3">
           {address}
@@ -249,6 +251,7 @@ export default function WalletAddressPage() {
       <WalletHeader
         address={data.address}
         username={data.username}
+        source={data.source}
         totalScore={data.totalScore}
         totalVolume={data.metadata.totalVolume}
         totalPnl={data.metadata.totalPnl}

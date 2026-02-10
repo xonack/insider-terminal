@@ -4,7 +4,7 @@ import {
   getWalletCount,
   getStaleWallets,
 } from '@/lib/db/queries';
-import { CACHE_TTL } from '@/lib/utils/constants';
+import { CACHE_TTL, parseSource } from '@/lib/utils/constants';
 
 export const runtime = 'nodejs';
 
@@ -13,13 +13,14 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
   const offset = Math.max(parseInt(searchParams.get('offset') ?? '0', 10) || 0, 0);
   const minScore = Math.max(parseInt(searchParams.get('minScore') ?? '0', 10) || 0, 0);
+  const source = parseSource(searchParams.get('source'));
 
   try {
-    const wallets = await getLeaderboard(limit, offset, minScore > 0 ? minScore : undefined);
-    const total = await getWalletCount();
+    const wallets = await getLeaderboard(limit, offset, minScore > 0 ? minScore : undefined, source);
+    const total = await getWalletCount(source);
 
     // Check if data is stale (any wallet scored more than walletScore TTL ago)
-    const staleWallets = await getStaleWallets(CACHE_TTL.walletScore, 1);
+    const staleWallets = await getStaleWallets(CACHE_TTL.walletScore, 1, source);
     const hasStaleData = total === 0 || staleWallets.length > 0;
 
     return NextResponse.json({

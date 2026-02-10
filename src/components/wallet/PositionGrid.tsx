@@ -1,5 +1,7 @@
 "use client";
 
+import { MarketBadge } from "@/components/shared/MarketBadge";
+
 interface Position {
   condition_id: string;
   title: string | null;
@@ -8,6 +10,7 @@ interface Position {
   avgPrice: number;
   currentPrice: number;
   unrealizedPnl: number;
+  market_source?: "polymarket" | "kalshi";
 }
 
 interface PositionGridProps {
@@ -48,6 +51,7 @@ export function PositionGrid({ positions }: PositionGridProps) {
         <table className="w-full">
           <thead>
             <tr>
+              <th className="text-left">Src</th>
               <th className="text-left">Market</th>
               <th className="text-left">Side</th>
               <th className="text-right">Size</th>
@@ -70,12 +74,16 @@ export function PositionGrid({ positions }: PositionGridProps) {
                 pos.title ?? `${pos.condition_id.slice(0, 8)}...`;
               const truncatedTitle =
                 title.length > 40 ? `${title.slice(0, 40)}...` : title;
+              const source = pos.market_source ?? "polymarket";
 
               return (
                 <tr
                   key={pos.condition_id}
                   className="border-t border-terminal-border/50 hover:bg-terminal-surface/50"
                 >
+                  <td>
+                    <MarketBadge source={source} />
+                  </td>
                   <td>
                     <span className="text-terminal-text" title={title}>
                       {truncatedTitle}

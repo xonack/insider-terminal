@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRecentTraders } from '@/lib/polymarket/data-api';
 import { getWallet, getWalletCount } from '@/lib/db/queries';
 import { scoreWallet } from '@/lib/scoring/engine';
-import { CACHE_TTL } from '@/lib/utils/constants';
+import { CACHE_TTL, validateSource, VALID_SOURCES } from '@/lib/utils/constants';
+import type { MarketSource } from '@/lib/utils/constants';
 
 export const runtime = 'nodejs';
 
@@ -10,9 +11,22 @@ const MAX_WALLETS_PER_SCAN = 25;
 
 export async function POST(request: NextRequest) {
   const force = request.nextUrl.searchParams.get('force') === 'true';
+  const sourceParam = request.nextUrl.searchParams.get('source');
+
+  if (sourceParam && !VALID_SOURCES.includes(sourceParam)) {
+    return NextResponse.json({ error: 'Invalid source' }, { status: 400 });
+  }
+  const source: MarketSource = validateSource(sourceParam);
 
   try {
     // 1. Discover active wallets from recent trades
+    // For now, only Polymarket supports wallet discovery via public trades
+    if (source === 'kalshi') {
+      return NextResponse.json({
+        error: 'Kalshi scan requires authenticated API keys. Use /api/wallet/:userId?source=kalshi for individual scoring.',
+      }, { status: 400 });
+    }
+
     const walletAddresses = await getRecentTraders(500);
 
     const now = Math.floor(Date.now() / 1000);
@@ -33,7 +47,7 @@ export async function POST(request: NextRequest) {
 
       // 3. Score the wallet
       try {
-        const result = await scoreWallet(address);
+        const result = await scoreWallet(address, source);
         scanned++;
 
         if (result.totalScore > 60) {
@@ -52,6 +66,7 @@ export async function POST(request: NextRequest) {
       newAlerts,
       total,
       discovered: walletAddresses.length,
+      source,
       ...(errors.length > 0 ? { errors } : {}),
     });
   } catch (error) {

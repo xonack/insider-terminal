@@ -1,5 +1,7 @@
 import { ensureDb } from './index';
 
+export type MarketSource = 'polymarket' | 'kalshi';
+
 export interface WalletRow {
   address: string;
   username: string | null;
@@ -17,6 +19,7 @@ export interface WalletRow {
   first_trade_at: number | null;
   last_trade_at: number | null;
   trade_count: number | null;
+  market_source: MarketSource;
   scored_at: number;
   created_at: number;
 }
@@ -33,6 +36,7 @@ export interface TradeRow {
   title: string | null;
   outcome: string | null;
   event_slug: string | null;
+  market_source: MarketSource;
 }
 
 export interface MarketRow {
@@ -45,6 +49,7 @@ export interface MarketRow {
   outcome: string | null;
   active: number | null;
   volume: number | null;
+  market_source: MarketSource;
   cached_at: number;
 }
 
@@ -80,13 +85,13 @@ export async function upsertWallet(wallet: WalletRow): Promise<void> {
         signal_wallet_age, signal_first_bet, signal_bet_timing,
         signal_withdrawal_speed, signal_market_selection, signal_win_rate,
         signal_no_hedging, total_volume, total_pnl,
-        first_trade_at, last_trade_at, trade_count, scored_at, created_at
+        first_trade_at, last_trade_at, trade_count, market_source, scored_at, created_at
       ) VALUES (
         ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?,
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         COALESCE(
           (SELECT created_at FROM wallets WHERE address = ?),
           ?
@@ -98,7 +103,7 @@ export async function upsertWallet(wallet: WalletRow): Promise<void> {
       wallet.signal_wallet_age, wallet.signal_first_bet, wallet.signal_bet_timing,
       wallet.signal_withdrawal_speed, wallet.signal_market_selection, wallet.signal_win_rate,
       wallet.signal_no_hedging, wallet.total_volume, wallet.total_pnl,
-      wallet.first_trade_at, wallet.last_trade_at, wallet.trade_count, wallet.scored_at,
+      wallet.first_trade_at, wallet.last_trade_at, wallet.trade_count, wallet.market_source, wallet.scored_at,
       wallet.address,
       wallet.created_at,
     ],
@@ -114,34 +119,46 @@ export async function getWallet(address: string): Promise<WalletRow | null> {
   return (result.rows[0] as unknown as WalletRow | undefined) ?? null;
 }
 
-export async function getLeaderboard(limit: number, offset: number, minScore?: number): Promise<WalletRow[]> {
+export async function getLeaderboard(limit: number, offset: number, minScore?: number, source?: MarketSource): Promise<WalletRow[]> {
   const db = await ensureDb();
+  const sourceFilter = source ? 'AND market_source = ?' : '';
+  const sourceArgs = source ? [source] : [];
+
   if (minScore !== undefined) {
     const result = await db.execute({
-      sql: 'SELECT * FROM wallets WHERE total_score >= ? ORDER BY total_score DESC LIMIT ? OFFSET ?',
-      args: [minScore, limit, offset],
+      sql: `SELECT * FROM wallets WHERE total_score >= ? ${sourceFilter} ORDER BY total_score DESC LIMIT ? OFFSET ?`,
+      args: [minScore, ...sourceArgs, limit, offset],
     });
     return result.rows as unknown as WalletRow[];
   }
   const result = await db.execute({
-    sql: 'SELECT * FROM wallets ORDER BY total_score DESC LIMIT ? OFFSET ?',
-    args: [limit, offset],
+    sql: `SELECT * FROM wallets WHERE 1=1 ${sourceFilter} ORDER BY total_score DESC LIMIT ? OFFSET ?`,
+    args: [...sourceArgs, limit, offset],
   });
   return result.rows as unknown as WalletRow[];
 }
 
-export async function getStaleWallets(maxAgeSeconds: number, limit: number): Promise<WalletRow[]> {
+export async function getStaleWallets(maxAgeSeconds: number, limit: number, source?: MarketSource): Promise<WalletRow[]> {
   const db = await ensureDb();
   const cutoff = Math.floor(Date.now() / 1000) - maxAgeSeconds;
+  const sourceFilter = source ? 'AND market_source = ?' : '';
+  const sourceArgs = source ? [source] : [];
   const result = await db.execute({
-    sql: 'SELECT * FROM wallets WHERE scored_at < ? ORDER BY scored_at ASC LIMIT ?',
-    args: [cutoff, limit],
+    sql: `SELECT * FROM wallets WHERE scored_at < ? ${sourceFilter} ORDER BY scored_at ASC LIMIT ?`,
+    args: [cutoff, ...sourceArgs, limit],
   });
   return result.rows as unknown as WalletRow[];
 }
 
-export async function getWalletCount(): Promise<number> {
+export async function getWalletCount(source?: MarketSource): Promise<number> {
   const db = await ensureDb();
+  if (source) {
+    const result = await db.execute({
+      sql: 'SELECT COUNT(*) as count FROM wallets WHERE market_source = ?',
+      args: [source],
+    });
+    return Number(result.rows[0].count);
+  }
   const result = await db.execute('SELECT COUNT(*) as count FROM wallets');
   return Number(result.rows[0].count);
 }
@@ -156,12 +173,12 @@ export async function insertTrades(trades: TradeRow[]): Promise<void> {
       sql: `
         INSERT INTO trades (
           wallet_address, condition_id, side, size, price,
-          timestamp, transaction_hash, title, outcome, event_slug
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          timestamp, transaction_hash, title, outcome, event_slug, market_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       args: [
         t.wallet_address, t.condition_id, t.side, t.size, t.price,
-        t.timestamp, t.transaction_hash, t.title, t.outcome, t.event_slug,
+        t.timestamp, t.transaction_hash, t.title, t.outcome, t.event_slug, t.market_source,
       ],
     })),
   );
@@ -199,12 +216,12 @@ export async function upsertMarket(market: MarketRow): Promise<void> {
     sql: `
       INSERT OR REPLACE INTO markets (
         condition_id, event_id, title, slug, end_date,
-        resolved_at, outcome, active, volume, cached_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        resolved_at, outcome, active, volume, market_source, cached_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     args: [
       market.condition_id, market.event_id, market.title, market.slug, market.end_date,
-      market.resolved_at, market.outcome, market.active, market.volume, market.cached_at,
+      market.resolved_at, market.outcome, market.active, market.volume, market.market_source, market.cached_at,
     ],
   });
 }

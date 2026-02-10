@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MarketBadge } from "@/components/shared/MarketBadge";
 
 interface Trade {
   id?: number;
@@ -14,6 +15,7 @@ interface Trade {
   title: string | null;
   outcome: string | null;
   event_slug: string | null;
+  market_source?: "polymarket" | "kalshi";
 }
 
 interface TradeTimelineProps {
@@ -112,6 +114,7 @@ export function TradeTimeline({ trades }: TradeTimelineProps) {
         <table className="w-full">
           <thead className="sticky top-0 bg-terminal-panel z-10">
             <tr>
+              <th className="text-left">Src</th>
               <th
                 className="text-left cursor-pointer hover:text-terminal-text select-none"
                 onClick={() => handleSort("timestamp")}
@@ -142,9 +145,12 @@ export function TradeTimeline({ trades }: TradeTimelineProps) {
                 ? "text-terminal-green"
                 : "text-terminal-red";
               const usdValue = trade.size * trade.price;
-              const marketUrl = trade.event_slug
-                ? `https://polymarket.com/event/${trade.event_slug}`
-                : null;
+              const tradeSource = trade.market_source ?? "polymarket";
+              const marketUrl = tradeSource === "kalshi"
+                ? `https://kalshi.com/markets/${trade.condition_id}`
+                : trade.event_slug
+                  ? `https://polymarket.com/event/${trade.event_slug}`
+                  : null;
               const title =
                 trade.title ??
                 `${trade.condition_id.slice(0, 8)}...`;
@@ -156,6 +162,9 @@ export function TradeTimeline({ trades }: TradeTimelineProps) {
                   key={trade.id ?? `${trade.condition_id}-${trade.timestamp}-${idx}`}
                   className="border-t border-terminal-border/50 hover:bg-terminal-surface/50"
                 >
+                  <td>
+                    <MarketBadge source={tradeSource} />
+                  </td>
                   <td
                     className="text-terminal-muted"
                     title={formatAbsoluteTime(trade.timestamp)}

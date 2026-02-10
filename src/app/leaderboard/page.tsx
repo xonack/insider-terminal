@@ -15,6 +15,7 @@ import type { WalletRow } from "@/lib/db/queries";
 import { ScoreBadge } from "@/components/shared/ScoreBadge";
 import { AddressDisplay } from "@/components/shared/AddressDisplay";
 import { SignalBars } from "@/components/leaderboard/SignalBars";
+import { MarketBadge } from "@/components/shared/MarketBadge";
 
 // --- Formatters ---
 
@@ -67,11 +68,13 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("address", {
-      header: () => <span title="Polymarket proxy wallet address and username">WALLET</span>,
+      header: () => <span title="Wallet address and platform source">WALLET</span>,
       cell: (info) => {
         const username = info.row.original.username;
+        const source = info.row.original.market_source ?? "polymarket";
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <MarketBadge source={source} />
             <AddressDisplay address={info.getValue()} />
             {username && (
               <span className="hidden sm:inline text-terminal-muted text-[10px]">
@@ -81,7 +84,7 @@ function getColumns(offset: number) {
           </div>
         );
       },
-      size: 85,
+      size: 110,
       enableSorting: false,
     }),
 

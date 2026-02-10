@@ -19,6 +19,7 @@ export async function initializeDatabase(db: Client): Promise<void> {
       first_trade_at INTEGER,
       last_trade_at INTEGER,
       trade_count INTEGER DEFAULT 0,
+      market_source TEXT NOT NULL DEFAULT 'polymarket',
       scored_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )
@@ -26,6 +27,7 @@ export async function initializeDatabase(db: Client): Promise<void> {
 
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_wallets_score ON wallets(total_score DESC)`);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_wallets_scored_at ON wallets(scored_at)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_wallets_source ON wallets(market_source, total_score DESC)`);
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS trades (
@@ -40,11 +42,13 @@ export async function initializeDatabase(db: Client): Promise<void> {
       title TEXT,
       outcome TEXT,
       event_slug TEXT,
+      market_source TEXT NOT NULL DEFAULT 'polymarket',
       FOREIGN KEY (wallet_address) REFERENCES wallets(address)
     )
   `);
 
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_trades_wallet ON trades(wallet_address, timestamp DESC)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_trades_source ON trades(market_source, wallet_address)`);
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS markets (
@@ -57,6 +61,7 @@ export async function initializeDatabase(db: Client): Promise<void> {
       outcome TEXT,
       active INTEGER DEFAULT 1,
       volume REAL DEFAULT 0,
+      market_source TEXT NOT NULL DEFAULT 'polymarket',
       cached_at INTEGER NOT NULL
     )
   `);
