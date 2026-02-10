@@ -133,7 +133,11 @@ function getColumns(offset: number) {
     }),
 
     columnHelper.accessor("trade_count", {
-      header: "TRADES",
+      header: () => (
+        <span title="Number of recent trades analyzed (max 300). Not the wallet's lifetime total.">
+          TRADES
+        </span>
+      ),
       cell: (info) => (
         <span className="text-terminal-text">{formatNumber(info.getValue())}</span>
       ),
