@@ -205,7 +205,7 @@ export default function LeaderboardPage() {
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch("/api/scan", { method: "POST" });
+      const res = await fetch("/api/scan?force=true", { method: "POST" });
       if (!res.ok) throw new Error("Scan failed");
       const result = await res.json() as { scanned: number; newAlerts: number; total: number };
       setScanResult(

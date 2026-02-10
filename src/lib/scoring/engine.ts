@@ -134,7 +134,9 @@ export async function scoreWallet(address: string): Promise<ScoringResult> {
   // Compute metadata
   const sorted = sortTradesByTime(trades);
   const totalVolume = trades.reduce((sum, t) => sum + tradeUsdValue(t), 0);
-  const totalPnl = positions.reduce((sum, p) => sum + p.realizedPnl + p.cashPnl, 0);
+  const totalPnl = positions.reduce((sum, p) => sum + (Number(p.realizedPnl) || 0) + (Number(p.cashPnl) || 0), 0);
+
+  console.log(`[scoreWallet] ${address.slice(0, 10)}… | positions: ${positions.length} | totalPnl: ${totalPnl.toFixed(2)} | sample:`, positions.length > 0 ? { cashPnl: positions[0].cashPnl, realizedPnl: positions[0].realizedPnl, types: { cashPnl: typeof positions[0].cashPnl, realizedPnl: typeof positions[0].realizedPnl } } : 'none');
 
   const metadata = {
     totalVolume,

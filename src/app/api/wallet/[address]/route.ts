@@ -29,10 +29,11 @@ export async function GET(
 
   try {
     // 1. Check DB cache
+    const force = _request.nextUrl.searchParams.get('force') === 'true';
     const cached = await getWallet(normalizedAddress);
     const now = Math.floor(Date.now() / 1000);
 
-    if (cached && now - cached.scored_at < CACHE_TTL.walletScore) {
+    if (!force && cached && now - cached.scored_at < CACHE_TTL.walletScore) {
       const trades = await getTradesForWallet(normalizedAddress, 50);
       const alerts = await getAlertsForWallet(normalizedAddress);
       const band = getScoreBand(cached.total_score);

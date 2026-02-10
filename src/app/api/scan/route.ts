@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getRecentTraders } from '@/lib/polymarket/data-api';
 import { getWallet, getWalletCount } from '@/lib/db/queries';
 import { scoreWallet } from '@/lib/scoring/engine';
@@ -8,7 +8,9 @@ export const runtime = 'nodejs';
 
 const MAX_WALLETS_PER_SCAN = 10;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const force = request.nextUrl.searchParams.get('force') === 'true';
+
   try {
     // 1. Discover active wallets from recent trades
     const walletAddresses = await getRecentTraders(500);
@@ -24,8 +26,8 @@ export async function POST() {
 
       const existing = await getWallet(address);
 
-      // Skip if recently scored
-      if (existing && now - existing.scored_at < CACHE_TTL.walletScore) {
+      // Skip if recently scored (unless force=true)
+      if (!force && existing && now - existing.scored_at < CACHE_TTL.walletScore) {
         continue;
       }
 
