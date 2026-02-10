@@ -21,12 +21,6 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Discover active wallets from recent trades
     // For now, only Polymarket supports wallet discovery via public trades
-    if (source === 'kalshi') {
-      return NextResponse.json({
-        error: 'Kalshi scan requires authenticated API keys. Use /api/wallet/:userId?source=kalshi for individual scoring.',
-      }, { status: 400 });
-    }
-
     const walletAddresses = await getRecentTraders(500);
 
     const now = Math.floor(Date.now() / 1000);

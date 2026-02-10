@@ -137,7 +137,6 @@ export function TerminalShell({ children }: TerminalShellProps) {
             >
               <option value="all">ALL MKTS</option>
               <option value="polymarket">POLY</option>
-              <option value="kalshi">KALSHI</option>
             </select>
             <Clock />
           </div>
