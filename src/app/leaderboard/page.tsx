@@ -81,7 +81,7 @@ function getColumns(offset: number) {
           </div>
         );
       },
-      size: 200,
+      size: 85,
       enableSorting: false,
     }),
 
