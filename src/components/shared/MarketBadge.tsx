@@ -15,8 +15,8 @@ const BADGE_LABELS = {
 } as const;
 
 const BADGE_DESCRIPTIONS = {
-  polymarket: "Polymarket — Crypto prediction market",
-  kalshi: "Kalshi — Regulated US exchange",
+  polymarket: "Polymarket",
+  kalshi: "Kalshi",
 } as const;
 
 export function MarketBadge({ source }: MarketBadgeProps) {
