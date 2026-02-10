@@ -116,16 +116,26 @@ export async function getWallet(address: string): Promise<WalletRow | null> {
 
 export async function getLeaderboard(limit: number, offset: number, minScore?: number): Promise<WalletRow[]> {
   const db = await ensureDb();
-  if (minScore !== undefined) {
-    const result = await db.execute({
-      sql: 'SELECT * FROM wallets WHERE total_score >= ? ORDER BY total_score DESC LIMIT ? OFFSET ?',
-      args: [minScore, limit, offset],
-    });
-    return result.rows as unknown as WalletRow[];
-  }
+  const scoreFilter = minScore !== undefined ? 'AND total_score >= ?' : '';
+  const scoreArgs = minScore !== undefined ? [minScore] : [];
+
+  // Deduplicate: keep only the highest-scored wallet per username.
+  // NULL usernames partition by address so each stays as a separate row.
   const result = await db.execute({
-    sql: 'SELECT * FROM wallets ORDER BY total_score DESC LIMIT ? OFFSET ?',
-    args: [limit, offset],
+    sql: `
+      SELECT * FROM (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(username, address)
+          ORDER BY total_score DESC
+        ) AS rn
+        FROM wallets
+        WHERE 1=1 ${scoreFilter}
+      ) ranked
+      WHERE rn = 1
+      ORDER BY total_score DESC
+      LIMIT ? OFFSET ?
+    `,
+    args: [...scoreArgs, limit, offset],
   });
   return result.rows as unknown as WalletRow[];
 }
@@ -142,7 +152,10 @@ export async function getStaleWallets(maxAgeSeconds: number, limit: number): Pro
 
 export async function getWalletCount(): Promise<number> {
   const db = await ensureDb();
-  const result = await db.execute('SELECT COUNT(*) as count FROM wallets');
+  // Count unique users (deduplicated by username, NULL usernames count individually)
+  const result = await db.execute(
+    'SELECT COUNT(*) as count FROM (SELECT 1 FROM wallets GROUP BY COALESCE(username, address))'
+  );
   return Number(result.rows[0].count);
 }
 
