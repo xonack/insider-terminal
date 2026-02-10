@@ -2,7 +2,7 @@
 
 import { useMarkets } from "@/hooks/useMarkets";
 import { InsiderIndicator } from "./InsiderIndicator";
-import { formatCompact, timeUntil } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/utils/format";
 
 export function MarketGrid() {
   const { data, isLoading, error } = useMarkets();
@@ -31,7 +31,7 @@ export function MarketGrid() {
   if (!data || data.markets.length === 0) {
     return (
       <div className="p-4 text-terminal-dim text-xs font-mono text-center mt-8">
-        No markets with insider activity detected.
+        No markets found. Run a scan first to populate trade data.
       </div>
     );
   }
@@ -44,8 +44,9 @@ export function MarketGrid() {
           conditionId={market.conditionId}
           title={market.title}
           slug={market.slug}
-          endDate={market.endDate}
-          volume={market.volume}
+          traderCount={market.traderCount}
+          totalVolume={market.totalVolume}
+          tradeCount={market.tradeCount}
           insiderCount={market.insiderCount}
         />
       ))}
@@ -57,8 +58,9 @@ interface MarketCardProps {
   conditionId: string;
   title: string;
   slug: string;
-  endDate: string;
-  volume: number;
+  traderCount: number;
+  totalVolume: number;
+  tradeCount: number;
   insiderCount: number;
 }
 
@@ -66,13 +68,14 @@ function MarketCard({
   conditionId,
   title,
   slug,
-  endDate,
-  volume,
+  traderCount,
+  totalVolume,
+  tradeCount,
   insiderCount,
 }: MarketCardProps) {
-  const endMs = new Date(endDate).getTime();
-  const resolveLabel = timeUntil(endMs);
-  const polymarketUrl = `https://polymarket.com/event/${slug}`;
+  const polymarketUrl = slug
+    ? `https://polymarket.com/event/${slug}`
+    : `https://polymarket.com`;
 
   return (
     <a
@@ -94,24 +97,24 @@ function MarketCard({
         {title}
       </h3>
 
-      {/* Resolution time */}
+      {/* Stats row */}
       <div className="flex items-center justify-between">
-        <span className="text-terminal-yellow text-[10px] uppercase tracking-wider font-bold">
-          Resolves {resolveLabel}
+        <span className="text-terminal-dim text-[10px] font-mono">
+          {traderCount} traders · {tradeCount} trades
         </span>
         <span className="text-terminal-dim text-[10px] font-mono" title={conditionId}>
           {conditionId.slice(0, 8)}...
         </span>
       </div>
 
-      {/* Volume */}
+      {/* Volume + Insider */}
       <div className="flex items-center justify-between border-t border-terminal-border pt-2">
         <div className="flex flex-col gap-0.5">
           <span className="text-[9px] text-terminal-dim uppercase tracking-wider">
             Volume
           </span>
           <span className="text-terminal-text text-xs font-bold">
-            {formatCompact(volume)}
+            ${formatCompact(totalVolume)}
           </span>
         </div>
 

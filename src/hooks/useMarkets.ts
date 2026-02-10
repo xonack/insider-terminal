@@ -6,9 +6,9 @@ export interface MarketWithInsiderActivity {
   conditionId: string;
   title: string;
   slug: string;
-  endDate: string;
-  volume: number;
-  active: boolean;
+  traderCount: number;
+  totalVolume: number;
+  tradeCount: number;
   insiderCount: number;
   insiderAddresses: string[];
 }

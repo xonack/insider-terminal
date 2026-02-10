@@ -51,3 +51,45 @@ th {
 
 /* Selection */
 ::selection { background: var(--color-terminal-blue); color: white; }
+
+/* Boot sequence animations */
+@keyframes fadeInLine {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-line {
+  animation: fadeInLine 0.15s ease-out forwards;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes bootDismiss {
+  from { opacity: 1; }
+  to { opacity: 0; filter: brightness(2); }
+}
+.animate-boot-dismiss {
+  animation: bootDismiss 0.3s ease-out forwards;
+  pointer-events: none;
+}
+
+/* CRT scanline overlay */
+.boot-scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.02) 2px,
+    rgba(0, 255, 0, 0.02) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
