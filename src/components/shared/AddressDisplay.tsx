@@ -9,9 +9,15 @@ interface AddressDisplayProps {
 export function AddressDisplay({ address }: AddressDisplayProps) {
   const [copied, setCopied] = useState(false);
 
+  // Mobile: 0x12...34 (4+4), Desktop: 0x1234...5678 (6+4)
   const truncated =
     address.length > 12
       ? `${address.slice(0, 6)}...${address.slice(-4)}`
+      : address;
+
+  const truncatedMobile =
+    address.length > 12
+      ? `${address.slice(0, 4)}...${address.slice(-4)}`
       : address;
 
   const handleCopy = useCallback(async () => {
@@ -26,7 +32,8 @@ export function AddressDisplay({ address }: AddressDisplayProps) {
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="text-terminal-blue text-xs font-mono">{truncated}</span>
+      <span className="text-terminal-blue text-xs font-mono hidden sm:inline">{truncated}</span>
+      <span className="text-terminal-blue text-xs font-mono sm:hidden">{truncatedMobile}</span>
       <button
         type="button"
         onClick={handleCopy}

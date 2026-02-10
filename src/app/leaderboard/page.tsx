@@ -74,7 +74,7 @@ function getColumns(offset: number) {
           <div className="flex items-center gap-2">
             <AddressDisplay address={info.getValue()} />
             {username && (
-              <span className="text-terminal-muted text-[10px]">
+              <span className="hidden sm:inline text-terminal-muted text-[10px]">
                 ({username})
               </span>
             )}
