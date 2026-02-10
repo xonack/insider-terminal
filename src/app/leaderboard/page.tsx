@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -183,6 +183,7 @@ function SkeletonRows({ count }: { count: number }) {
 
 export default function LeaderboardPage() {
   const router = useRouter();
+  const [source, setSource] = useState<string | undefined>(undefined);
   const [offset, setOffset] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "total_score", desc: true },
@@ -190,8 +191,13 @@ export default function LeaderboardPage() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
 
+  useEffect(() => {
+    const src = new URL(window.location.href).searchParams.get("source");
+    if (src) setSource(src);
+  }, []);
+
   const limit = 50;
-  const { data, isLoading, isError, error, refetch } = useLeaderboard(limit, offset, 0);
+  const { data, isLoading, isError, error, refetch } = useLeaderboard(limit, offset, 0, source);
   const columns = useMemo(() => getColumns(offset), [offset]);
 
   const table = useReactTable({

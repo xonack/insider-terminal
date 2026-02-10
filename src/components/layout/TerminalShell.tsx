@@ -64,6 +64,7 @@ interface TerminalShellProps {
 export function TerminalShell({ children }: TerminalShellProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [currentSource, setCurrentSource] = useState("all");
   const [dismissed, setDismissed] = useLocalStorage(ONBOARDING_KEY, false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -80,6 +81,8 @@ export function TerminalShell({ children }: TerminalShellProps) {
 
   useEffect(() => {
     setMounted(true);
+    const src = new URL(window.location.href).searchParams.get("source");
+    if (src) setCurrentSource(src);
   }, []);
 
   const showBoot = mounted && !dismissed;
@@ -120,7 +123,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
           <div className="flex items-center gap-3">
             <select
               className="bg-terminal-surface text-terminal-muted text-[10px] uppercase tracking-wider border border-terminal-border rounded px-1.5 py-0.5 focus:outline-none focus:border-terminal-green cursor-pointer"
-              defaultValue="all"
+              value={currentSource}
               onChange={(e) => {
                 const val = e.target.value;
                 const url = new URL(window.location.href);
