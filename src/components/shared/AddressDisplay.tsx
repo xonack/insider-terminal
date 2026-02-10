@@ -9,7 +9,7 @@ interface AddressDisplayProps {
 export function AddressDisplay({ address }: AddressDisplayProps) {
   const [copied, setCopied] = useState(false);
 
-  // Mobile: 0x12...34 (4+4), Desktop: 0x1234...5678 (6+4)
+  // Mobile: 0x...1234 (2+4), Desktop: 0x1234...5678 (6+4)
   const truncated =
     address.length > 12
       ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -17,7 +17,7 @@ export function AddressDisplay({ address }: AddressDisplayProps) {
 
   const truncatedMobile =
     address.length > 12
-      ? `${address.slice(0, 4)}...${address.slice(-4)}`
+      ? `0x...${address.slice(-4)}`
       : address;
 
   const handleCopy = useCallback(async () => {
