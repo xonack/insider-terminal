@@ -16,12 +16,12 @@ export function validateSource(value: string | null): MarketSource {
 }
 
 export const SIGNAL_WEIGHTS = {
-  walletAge: 15,
+  walletAge: 10,
   firstBetSize: 15,
   betTiming: 20,
-  withdrawalSpeed: 15,
-  marketSelection: 10,
-  winRate: 15,
+  withdrawalSpeed: 5,
+  marketSelection: 15,
+  winRate: 25,
   noHedging: 10,
 } as const;
 

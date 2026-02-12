@@ -22,15 +22,15 @@ export function scoreWalletAge(trades: PolymarketTrade[]): SignalResult {
   const ageDays = (nowUnix() - firstTradeTimestamp) / 86400;
 
   let raw: number;
-  if (ageDays < 7) {
+  if (ageDays < 1) {
     raw = 1.0;
-  } else if (ageDays < 14) {
+  } else if (ageDays < 3) {
     raw = 0.8;
-  } else if (ageDays < 30) {
+  } else if (ageDays < 7) {
     raw = 0.6;
-  } else if (ageDays < 90) {
+  } else if (ageDays < 14) {
     raw = 0.3;
-  } else if (ageDays < 180) {
+  } else if (ageDays < 30) {
     raw = 0.1;
   } else {
     raw = 0.0;

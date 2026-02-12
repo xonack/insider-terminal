@@ -40,7 +40,7 @@ export function scoreMarketSelection(
     // We need to check the original market outcomes count. Since MarketRow doesn't store outcome count,
     // we check volume only and assume binary (Polymarket markets are predominantly binary).
     // A more robust approach would store outcome count in MarketRow.
-    const isHighVolume = volume > 100_000;
+    const isHighVolume = volume > 25_000;
 
     if (isHighVolume) {
       highStakesCount++;
