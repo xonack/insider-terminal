@@ -33,8 +33,8 @@ export function scoreWinRate(
     }
   }
 
-  // Filter positions: market must be closed and resolved within 7 days of first trade
-  const sevenDays = 7 * 24 * 3600;
+  // Filter positions: market must be closed and resolved within 30 days of first trade
+  const thirtyDays = 30 * 24 * 3600;
   let wins = 0;
   let losses = 0;
 
@@ -49,12 +49,13 @@ export function scoreWinRate(
     if (firstTrade === undefined) continue;
 
     const resolvedWithin = market.end_date - firstTrade;
-    if (resolvedWithin < 0 || resolvedWithin > sevenDays) continue;
+    if (resolvedWithin < 0 || resolvedWithin > thirtyDays) continue;
 
-    // realizedPnl is the actual PnL on the position
-    if (pos.realizedPnl > 0) {
+    // Check both realizedPnl and cashPnl for win/loss determination
+    const pnl = Number(pos.realizedPnl) + Number(pos.cashPnl);
+    if (pnl > 0) {
       wins++;
-    } else if (pos.realizedPnl < 0) {
+    } else if (pnl < 0) {
       losses++;
     }
     // Zero PnL positions are excluded
@@ -62,25 +63,25 @@ export function scoreWinRate(
 
   const total = wins + losses;
 
-  if (total < 3) {
+  if (total < 2) {
     return makeSignal(
       0,
       weight,
-      `Only ${total} qualifying positions (need >= 3)`,
+      `Only ${total} qualifying positions (need >= 2)`,
     );
   }
 
   const winRate = wins / total;
 
   let raw: number;
-  if (winRate > 0.95 && total >= 3) {
+  if (winRate > 0.9 && total >= 3) {
     raw = 1.0;
-  } else if (winRate > 0.85 && total >= 3) {
+  } else if (winRate > 0.8 && total >= 3) {
     raw = 0.8;
-  } else if (winRate > 0.7 && total >= 5) {
+  } else if (winRate > 0.7 && total >= 2) {
     raw = 0.6;
-  } else if (winRate > 0.7 && total >= 3) {
-    raw = 0.4;
+  } else if (winRate > 0.6 && total >= 2) {
+    raw = 0.3;
   } else {
     raw = 0.0;
   }

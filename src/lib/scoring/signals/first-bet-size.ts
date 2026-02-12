@@ -22,16 +22,18 @@ export function scoreFirstBetSize(trades: PolymarketTrade[]): SignalResult {
   const firstBetUsd = tradeUsdValue(sorted[0]);
 
   let raw: number;
-  if (firstBetUsd > 100_000) {
+  if (firstBetUsd > 25_000) {
     raw = 1.0;
-  } else if (firstBetUsd > 50_000) {
-    raw = 0.9;
-  } else if (firstBetUsd > 25_000) {
-    raw = 0.7;
   } else if (firstBetUsd > 10_000) {
-    raw = 0.4;
+    raw = 0.9;
   } else if (firstBetUsd > 5_000) {
-    raw = 0.2;
+    raw = 0.7;
+  } else if (firstBetUsd > 2_000) {
+    raw = 0.5;
+  } else if (firstBetUsd > 500) {
+    raw = 0.3;
+  } else if (firstBetUsd > 100) {
+    raw = 0.1;
   } else {
     raw = 0.0;
   }
