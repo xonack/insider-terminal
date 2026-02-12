@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TerminalBoot } from "@/components/onboarding/TerminalBoot";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Menu, X, MessageSquare } from "lucide-react";
+import { Menu, X, MessageSquare, Heart } from "lucide-react";
 import { SupportModal } from "./SupportModal";
+import { DonateModal } from "./DonateModal";
 
 interface StatusData {
   wallets: number;
@@ -68,6 +69,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
   const [dismissed, setDismissed] = useLocalStorage(ONBOARDING_KEY, false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [donateOpen, setDonateOpen] = useState(false);
 
   const { data: status } = useQuery<StatusData>({
     queryKey: ["status"],
@@ -169,11 +171,21 @@ export function TerminalShell({ children }: TerminalShellProps) {
             );
           })}
 
+          {/* Keep Alive / Donate button */}
+          <button
+            type="button"
+            onClick={() => setDonateOpen(true)}
+            className="mt-auto flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider text-terminal-cyan hover:text-terminal-green border-l-2 border-transparent transition-colors"
+          >
+            <Heart size={12} />
+            <span>Keep Alive</span>
+          </button>
+
           {/* Support button */}
           <button
             type="button"
             onClick={() => setSupportOpen(true)}
-            className="mt-auto flex items-center gap-2 px-4 py-2 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
+            className="flex items-center gap-2 px-4 py-2 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
           >
             <MessageSquare size={12} />
             <span>Support</span>
@@ -216,6 +228,19 @@ export function TerminalShell({ children }: TerminalShellProps) {
                 );
               })}
 
+              {/* Keep Alive / Donate button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  setDonateOpen(true);
+                }}
+                className="mt-auto flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-wider text-terminal-cyan hover:text-terminal-green border-l-2 border-transparent transition-colors"
+              >
+                <Heart size={12} />
+                <span>Keep Alive</span>
+              </button>
+
               {/* Support button */}
               <button
                 type="button"
@@ -223,7 +248,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
                   setSidebarOpen(false);
                   setSupportOpen(true);
                 }}
-                className="mt-auto flex items-center gap-2 px-4 py-3 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
+                className="flex items-center gap-2 px-4 py-3 mb-2 text-xs uppercase tracking-wider text-terminal-dim hover:text-terminal-muted border-l-2 border-transparent transition-colors"
               >
                 <MessageSquare size={12} />
                 <span>Support</span>
@@ -269,6 +294,7 @@ export function TerminalShell({ children }: TerminalShellProps) {
       </div>
 
       <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <DonateModal open={donateOpen} onClose={() => setDonateOpen(false)} />
     </>
   );
 }
