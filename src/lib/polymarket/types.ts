@@ -94,6 +94,8 @@ export interface PolymarketMarket {
   enableOrderBook: boolean;
   resolution: string;
   resolvedBy: string;
+  closedTime: string;
+  umaResolutionStatus: string;
   pagerDutyNotificationEnabled: boolean;
   events: PolymarketEventRef[];
 }

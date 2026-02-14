@@ -24,6 +24,42 @@ import { scoreWithdrawalSpeed } from './signals/withdrawal-speed';
 import { scoreMarketSelection } from './signals/market-selection';
 import { scoreWinRate } from './signals/win-rate';
 import { scoreNoHedging } from './signals/no-hedging';
+import type { PolymarketMarket } from '@/lib/polymarket/types';
+
+// --- Outcome resolution ---
+
+/**
+ * Derive the winning outcome from a Gamma API market response.
+ *
+ * The Gamma API doesn't return a `resolution` field. Instead:
+ * - `outcomes` is a JSON string like `["Yes","No"]`
+ * - `outcomePrices` is a JSON string like `["1","0"]` where "1" = winner
+ * - `closed` is true for resolved markets
+ *
+ * Returns the winning outcome name (e.g. "Yes") or null if unresolved.
+ */
+function deriveOutcome(market: PolymarketMarket): string | null {
+  if (!market.closed) return null;
+
+  try {
+    const outcomes: string[] = typeof market.outcomes === 'string'
+      ? JSON.parse(market.outcomes) : market.outcomes;
+    const prices: string[] = typeof market.outcomePrices === 'string'
+      ? JSON.parse(market.outcomePrices) : market.outcomePrices;
+
+    if (!Array.isArray(outcomes) || !Array.isArray(prices)) return null;
+
+    const winnerIndex = prices.findIndex(p => p === '1');
+    if (winnerIndex >= 0 && winnerIndex < outcomes.length) {
+      return outcomes[winnerIndex];
+    }
+  } catch {
+    // Malformed JSON — fall through
+  }
+
+  // Fallback to resolution field if it exists
+  return market.resolution || null;
+}
 
 // --- Kalshi → Polymarket normalizers ---
 
@@ -126,9 +162,9 @@ async function buildPolymarketCache(trades: PolymarketTrade[], source: MarketSou
         title,
         slug: apiMarket.slug,
         end_date: isoToUnix(apiMarket.endDate),
-        resolved_at: apiMarket.closed ? isoToUnix(apiMarket.updatedAt) : null,
-        outcome: apiMarket.resolution || null,
-        active: apiMarket.active ? 1 : 0,
+        resolved_at: apiMarket.closed ? isoToUnix(apiMarket.closedTime ?? apiMarket.updatedAt) : null,
+        outcome: deriveOutcome(apiMarket),
+        active: apiMarket.active && !apiMarket.closed ? 1 : 0,
         volume: apiMarket.volumeNum ?? 0,
         market_source: source,
         cached_at: now,
