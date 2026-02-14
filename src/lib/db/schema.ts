@@ -111,4 +111,19 @@ export async function initializeDatabase(db: Client): Promise<void> {
   `);
 
   await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tweet_log_ref ON tweet_log(tweet_type, ref_id)`);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      message TEXT NOT NULL,
+      email TEXT,
+      status TEXT NOT NULL DEFAULT 'new',
+      agent_response TEXT,
+      responded_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_support_status ON support_messages(status, created_at DESC)`);
 }
